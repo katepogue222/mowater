@@ -1,0 +1,250 @@
+---
+title: "EPS and SRT Wrangling"
+author: "Kate Pogue"
+date: "2023-06-16"
+output: html_document
+---
+
+
+Loading Packages
+```{r}
+library(tidyverse)
+library(Metrics)
+library(tidyr)
+library(dplyr)
+library(olsrr)
+library(openxlsx)
+library(zoo)
+library(leaps)
+library(ggeffects)
+library(glmnet)
+library(gratia)
+```
+
+Loading Data
+```{r}
+NAB2 <- read_csv("data/NAB2.csv")
+EPS <- read_excel("data/all_EPS.xlsx")
+ASRT_main <- read_excel("data/ASRT_main.xlsx")
+ASRT_other <- read_excel("data/ASRT_other.xlsx")
+```
+
+make e. coli reduction variable 
+```{r}
+#select relevent variables
+ecoli <- NAB2 %>% select(timestamp, 
+                         "NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)", 
+                         "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)", 
+                         "NSI E. coli (LAB) (EC/100mL)", 
+                         "NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)")
+
+#merge the basin 4 and 9 data
+ecoli$`NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)`[is.na(ecoli$`NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)`)] <- 0
+ecoli$`NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)`[is.na(ecoli$`NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)`)] <- 0
+
+ecoli <- mutate(ecoli, "NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)" = 
+              (ecoli$`NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)` + ecoli$'NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)'))
+
+ecoli$'NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)'[ecoli$'NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)' == 0] <- NA
+ecoli <- ecoli %>% select(-'NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)', -'NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)')
+
+## make reduction variable
+ecoli$pilot_reduction <- ecoli$`NSI E. coli (LAB) (EC/100mL)`-ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`
+
+ecoli$control_reduction <- ecoli$`NSI E. coli (LAB) (EC/100mL)`-ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`
+
+#only select useful variables
+ecoli <- ecoli %>% select(timestamp, pilot_reduction, control_reduction)
+ecoli <- na.omit(ecoli)
+
+#look at distributions
+ggplot(data = ecoli, aes(x = pilot_reduction,)) +
+  geom_density()
+
+##both variables are very right skewed. I'm going to try log transforming the data
+
+ecoli$log_pilot_reduction <- log(ecoli$pilot_reduction)
+ecoli$log_control_reduction <- log(ecoli$control_reduction)
+
+ecoli$reduction_difference <- ecoli$pilot_reduction - ecoli$control_reduction
+
+```
+
+Plot these two variables as line graphs
+```{r}
+# Create the line graph using ggplot with default settings
+ggplot(ecoli, aes(x = timestamp)) +
+  geom_line(aes(y = pilot_reduction, color = "Pilot")) +
+  geom_line(aes(y = control_reduction, color = "Control")) +
+  labs(x = "Timestamp", y = "E. coli reduction (EC/100mL)",
+       title = "E. coli Reduction Timeseries") +
+  scale_color_manual(values = c("blue", "red")) +
+  theme_minimal()
+
+# make one for reduction difference
+ggplot(ecoli, aes(x = timestamp)) +
+  geom_line(aes(y = reduction_difference)) +
+  labs(x = "Timestamp", y = "E. coli reduction (EC/100mL)",
+       title = "Difference in E. coli Reduction Timeseries (Pilot - Control)") +
+  theme_minimal()
+```
+
+
+
+PILOT: Wrangle EPS 
+```{r}
+#rename timestamp
+EPS <- EPS %>% rename(timestamp = 1)
+
+#select pilot variables
+pilot_eps <- EPS %>% select(timestamp, starts_with("Pilot"))
+
+#get other factors
+others <- NAB2 %>% select(timestamp,
+                          "AB2A DO (mg/L)",  
+                          "AB2A NO5 (mgN/L)",  
+                          "AB2A NH3 (mg N/L)", 
+                          "AB2C NH3 (mg N/L)", 
+                          "NSI TEMP (C)",
+                          "Clarifier 2 SLR (ppd/sf)",
+                          "NSI TKNH (LAB) (mg/L)",
+                          "AB2 Anaerobic F/M  (g sCOD/ g MLSS)",
+                          "AB2A AIRFLOW (SCFM)"
+                          
+                          )
+colnames(others) <- c("timestamp",
+                          "AB2A_DO_mg_per_L",  
+                          "AB2A_NO5_mgN_per_L",  
+                          "AB2A_NH3_mg_N_per_L", 
+                          "AB2C_NH3_mg_N_per_L", 
+                          "NSI_TEMP_C",
+                          "Clarifier_2_SLR_ppd_sf",
+                          "NSI_TKNH_LAB_mg_per_L",
+                          "AB2_Anaerobic_FM_g_sCOD_g_MLSS",
+                          "AB2_INF_FLOW_MGD",
+                          "AB2A_AIRFLOW_SCFM"
+                          )
+
+#get other ASRT variables for pilot
+ASRT_other_pilot <- ASRT_other %>% select(timestamp, starts_with("Pilot"))
+colnames(ASRT_other_pilot) <- c("timestamp",
+                                "Pilot_ASRT_d",
+                                "Pilot_Floc_SRT_d",
+                                "Pilot_Granule_SRT_d",
+                                "Pilot_AGS_Weighted_SRT_d",
+                                "Pilot_Floc_percent",
+                                "Pilot_Granule_percent")
+
+#select pilot ecoli
+pilot_ecoli <- ecoli %>% select(timestamp, log_pilot_reduction)
+pilot_factors <- left_join(pilot_ecoli, pilot_eps, by = "timestamp")
+colnames(pilot_factors) <- c("timestamp", "log_pilot_reduction", "pilot_total_cod_mgcod_per_gvss",
+                  "pilot_total_pn_to_ps", "pilot_lb_cod_mgcod_per_gvss",
+                  "pilot_lb_proteins_mg_per_gvss", "pilot_lb_carbs_mg_per_gvss",
+                  "pilot_tb_cod_mgcod_per_gvss", "pilot_tb_proteins_mg_per_gvss",
+                  "pilot_tb_carbs_mgcarb_per_gvss", "pilot_tb_pn_to_ps")
+
+
+#FILL method to fill in missing EPS and ASRT values
+pilot_eps_filled <- pilot_factors
+pilot_eps_filled <- left_join(pilot_eps_filled, others, by = "timestamp")
+pilot_eps_filled <- left_join(pilot_eps_filled, ASRT_main[,-3], by = "timestamp")
+pilot_eps_filled <- left_join(pilot_eps_filled, ASRT_other_pilot, by = "timestamp")
+pilot_eps_filled <- pilot_eps_filled %>% fill(everything(), .direction = "down")
+pilot_eps_filled <- na.omit(pilot_eps_filled)
+  
+#REMOVE method
+pilot_eps_removed <- na.omit(pilot_factors)
+pilot_eps_removed <- left_join(pilot_eps_removed, others, by = "timestamp")
+pilot_eps_removed <- left_join(pilot_eps_removed, ASRT_main[,-3], by = "timestamp")
+pilot_eps_removed <- left_join(pilot_eps_removed, ASRT_other_pilot, by = "timestamp")
+
+```
+
+
+Control: Wrangle EPS 
+```{r}
+#rename timestamp
+EPS <- EPS %>% rename(timestamp = 1)
+
+#select control variables
+control_eps <- EPS %>% select(timestamp, starts_with("Control"))
+
+
+#get other factors
+others <- NAB2 %>% select(timestamp,
+                          "AB9A DO (mg/L)",  
+                          "AB9A NO5 (mg N/L)",  
+                          "AB9A NH3 (mg N/L)", 
+                          "AB9C NH3 (mg N/L)", 
+                          "NSI TEMP (C)",
+                          "Clarifier 9 SLR (ppd/sf)",
+                          "AB9 INF FLOW (MGD)",
+                          "AB9A AIRFLOW (SCFM)"
+                          
+                          )
+colnames(others) <- c("timestamp",
+                          "AB9A_DO_mg_per_L",  
+                          "AB9A_NO5_mgN_per_L",  
+                          "AB9A_NH3_mg_N_per_L", 
+                          "AB9C_NH3_mg_N_per_L", 
+                          "NSI_TEMP_C",
+                          "Clarifier_9_SLR_ppd_sf",
+                          "AB9_INF_FLOW_MGD",
+                          "AB9A_AIRFLOW_SCFM"
+                          )
+
+#get other ASRT variables for pilot
+ASRT_other_control <- ASRT_other %>% select(timestamp, starts_with("Control"))
+colnames(ASRT_other_control) <- c("timestamp",
+                                "Control_ASRT_d",
+                                "Control_Floc_SRT_d",
+                                "Control_Granule_SRT_d",
+                                "Control_AGS_Weighted_SRT_d",
+                                "Control_Floc_percent",
+                                "Control_Granule_percent")
+
+#select Control ecoli
+control_ecoli <- ecoli %>% select(timestamp, log_control_reduction)
+control_factors <- left_join(control_ecoli, control_eps, by = "timestamp")
+colnames(control_factors) <- c("timestamp", "log_control_reduction", "control_total_cod_mgcod_per_gvss",
+                  "control_total_pn_to_ps", "control_lb_cod_mgcod_per_gvss",
+                  "control_lb_proteins_mg_per_gvss", "control_lb_carbs_mg_per_gvss",
+                  "control_tb_cod_mgcod_per_gvss", "control_tb_proteins_mg_per_gvss",
+                  "control_tb_carbs_mgcarb_per_gvss", "control_tb_pn_to_ps")
+
+
+#FILL method to fill in missing EPS and ASRT values
+control_eps_filled <- control_factors
+control_eps_filled <- left_join(control_eps_filled, others, by = "timestamp")
+control_eps_filled <- left_join(control_eps_filled, ASRT_main[,-2], by = "timestamp")
+control_eps_filled <- left_join(control_eps_filled, ASRT_other_control, by = "timestamp")
+control_eps_filled <- control_eps_filled %>% fill(everything(), .direction = "down")
+control_eps_filled <- na.omit(control_eps_filled)
+
+#REMOVE method
+control_eps_removed <- na.omit(control_factors)
+control_eps_removed <- left_join(control_eps_removed, others, by = "timestamp")
+control_eps_removed <- left_join(control_eps_removed, ASRT_main[,-2], by = "timestamp")
+control_eps_removed <- left_join(control_eps_removed, ASRT_other_control, by = "timestamp")
+control_eps_removed <- na.omit(control_eps_removed)
+
+```
+
+
+Export new dataframes as csv files
+```{r}
+# Write Pilot FILLED
+write.csv(pilot_eps_filled, file = "/Users/katepogue/Desktop/MOWATER/data/pilot_eps_filled.csv", row.names = FALSE)
+
+# Write Pilot REMOVE
+write.csv(pilot_eps_removed, file = "/Users/katepogue/Desktop/MOWATER/data/pilot_eps_removed.csv", row.names = FALSE)
+
+# Write Control FILLED
+write.csv(control_eps_filled, file = "/Users/katepogue/Desktop/MOWATER/data/control_eps_filled.csv", row.names = FALSE)
+
+# Write Control REMOVED
+write.csv(control_eps_removed, file = "/Users/katepogue/Desktop/MOWATER/data/control_eps_removed.csv", row.names = FALSE)
+
+```
+

@@ -1,0 +1,112 @@
+---
+title: "Metro Outlier Detection Translated"
+author: "Kate Pogue"
+date: "2023-06-16"
+output: html_document
+---
+
+loading packages
+```{r}
+library("data.table")
+library("KernSmooth")
+library("stringr")
+library("moments")
+library("tidyverse")
+```
+
+
+loading data
+```{r}
+mergedDF <- read_csv("data/NAB2.csv")
+```
+
+Wrangle my own dataframe
+```{r}
+# Get the current column names
+column_names <- colnames(mergedDF)
+
+# Modify the name of the first column
+column_names[1] <- "ExpID"
+
+# Assign the modified column names back to the dataframe
+colnames(mergedDF) <- column_names
+
+mergedDF <- as.data.table(mergedDF)
+```
+
+
+Big for loop that uses sd and kernel density to remove outliers
+```{r}
+dataOutliers <- data.table(Col = character(), Timestamp = integer(), Value = numeric())
+
+# For each column
+for (i in colnames(mergedDF)) {
+  if (i == "ExpID") {
+    next
+  }
+  
+  # Reshape data
+  X <- mergedDF[[i]]
+  X <- X[!is.na(X)]
+  X <- as.numeric(X)
+  
+  if (length(X) < 2) {
+    next
+  }
+  
+  X_sd <- sd(X)
+  if (X_sd > 1) {
+    X_sd <- round(X_sd)
+  }
+  
+  # Histogram of each variable
+  hist <- hist(X, plot = FALSE)
+  
+  left <- hist$breaks[-length(hist$breaks)]
+  right <- hist$breaks[-1]
+  wid <- right - left
+  
+  # Initiate variables
+  n <- 1000  # Number of samples 
+  x_min <- min(X) - X_sd
+  if (x_min < 0) {
+    x_min <- 0
+  }
+  X_d <- seq(from = x_min, to = max(X) + X_sd, length.out = n)  # Samples
+  
+  # KDE estimation
+  logprobX_d <- density(X, kernel = "gaussian", bw = wid[1] * 2)$y
+  
+  alpha_set <- 0.99
+  tau <- quantile(logprobX_d, 1 - alpha_set)
+  outliersX_d <- which(logprobX_d < tau)
+  
+  if (length(outliersX_d) > 0) {
+    outliersX <- which(X %in% X_d[outliersX_d])
+    for (index in outliersX) {
+      # Create result object
+      outlierVal <- data.table(Col = i, Timestamp = which(mergedDF[[i]] == X[index])[1], Value = X[index])
+      dataOutliers <- rbindlist(list(dataOutliers, outlierVal))
+    }
+  }
+  
+  # Remove outliers by replacing with NA
+  for (r in 1:nrow(dataOutliers)) {
+    # Column name
+    n <- dataOutliers$Col[r]
+    # Index
+    m <- dataOutliers$Timestamp[r]
+    # Original dataframe location
+    mergedDF[m, (n) := NA]
+  }
+}
+
+```
+
+
+Export data
+```{r}
+fwrite(dataOutliers, "data/NAB2_outliers")
+fwrite(mergedDF, "data/NAB2_cleaned.pkl")
+```
+
