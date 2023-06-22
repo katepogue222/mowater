@@ -14,6 +14,7 @@ library(tidyr)
 library(dplyr)
 library(olsrr)
 library(openxlsx)
+library(readxl)
 library(zoo)
 library(leaps)
 library(ggeffects)
@@ -23,6 +24,7 @@ library(gratia)
 
 Loading Data
 ```{r}
+getwd()
 NAB2 <- read_csv("data/NAB2.csv")
 EPS <- read_excel("data/all_EPS.xlsx")
 ASRT_main <- read_excel("data/ASRT_main.xlsx")
@@ -31,7 +33,7 @@ ASRT_other <- read_excel("data/ASRT_other.xlsx")
 
 make e. coli reduction variable 
 ```{r}
-#select relevent variables
+#select relevant variables
 ecoli <- NAB2 %>% select(timestamp, 
                          "NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)", 
                          "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)", 
@@ -48,46 +50,47 @@ ecoli <- mutate(ecoli, "NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)" 
 ecoli$'NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)'[ecoli$'NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)' == 0] <- NA
 ecoli <- ecoli %>% select(-'NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)', -'NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)')
 
-## make reduction variable
-ecoli$pilot_reduction <- ecoli$`NSI E. coli (LAB) (EC/100mL)`-ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`
+## make LOG reduction variable
+ecoli$log_pilot_reduction <- log(ecoli$`NSI E. coli (LAB) (EC/100mL)`)- log(ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`)
 
-ecoli$control_reduction <- ecoli$`NSI E. coli (LAB) (EC/100mL)`-ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`
+ecoli$log_control_reduction <- log(ecoli$`NSI E. coli (LAB) (EC/100mL)`)-log(ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`)
+
+
+## normal effluent variables just need to be log transformed
+ecoli$log_pilot_ecoli <- log(ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`)
+ecoli$log_control_ecoli <- log(ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`)
+
 
 #only select useful variables
-ecoli <- ecoli %>% select(timestamp, pilot_reduction, control_reduction)
+ecoli <- ecoli %>% select(timestamp, 
+                          log_pilot_reduction, 
+                          log_control_reduction, 
+                          log_pilot_ecoli, 
+                          log_control_ecoli)
 ecoli <- na.omit(ecoli)
 
 #look at distributions
-ggplot(data = ecoli, aes(x = pilot_reduction,)) +
-  geom_density()
+ggplot() +
+  geom_density(data = ecoli, aes(x = log_pilot_ecoli), color = "red", fill = "red", alpha = 0.3) +
+  geom_density(data = ecoli, aes(x = log_control_ecoli), color = "blue", fill = "blue", alpha = 0.3) +
+  geom_density(data = ecoli, aes(x = log_pilot_reduction), color = "green", fill = "green", alpha = 0.3) +
+  geom_density(data = ecoli, aes(x = log_control_reduction), color = "orange", fill = "orange", alpha = 0.3) +
+  xlab("Value") +
+  ylab("Density") +
+  ggtitle("Densities of Ecoli Variables") +
+  theme_minimal()
 
-##both variables are very right skewed. I'm going to try log transforming the data
 
-ecoli$log_pilot_reduction <- log(ecoli$pilot_reduction)
-ecoli$log_control_reduction <- log(ecoli$control_reduction)
-
-ecoli$reduction_difference <- ecoli$pilot_reduction - ecoli$control_reduction
-
-```
-
-Plot these two variables as line graphs
-```{r}
-# Create the line graph using ggplot with default settings
+# Plot Reductions as line graphs
 ggplot(ecoli, aes(x = timestamp)) +
-  geom_line(aes(y = pilot_reduction, color = "Pilot")) +
-  geom_line(aes(y = control_reduction, color = "Control")) +
+  geom_line(aes(y = log_pilot_reduction, color = "Pilot")) +
+  geom_line(aes(y = log_control_reduction, color = "Control")) +
   labs(x = "Timestamp", y = "E. coli reduction (EC/100mL)",
        title = "E. coli Reduction Timeseries") +
   scale_color_manual(values = c("blue", "red")) +
   theme_minimal()
-
-# make one for reduction difference
-ggplot(ecoli, aes(x = timestamp)) +
-  geom_line(aes(y = reduction_difference)) +
-  labs(x = "Timestamp", y = "E. coli reduction (EC/100mL)",
-       title = "Difference in E. coli Reduction Timeseries (Pilot - Control)") +
-  theme_minimal()
 ```
+
 
 
 
@@ -136,7 +139,7 @@ colnames(ASRT_other_pilot) <- c("timestamp",
                                 "Pilot_Granule_percent")
 
 #select pilot ecoli
-pilot_ecoli <- ecoli %>% select(timestamp, log_pilot_reduction)
+pilot_ecoli <- ecoli %>% select(timestamp, log_pilot_reduction, log_pilot_ecoli)
 pilot_factors <- left_join(pilot_ecoli, pilot_eps, by = "timestamp")
 colnames(pilot_factors) <- c("timestamp", "log_pilot_reduction", "pilot_total_cod_mgcod_per_gvss",
                   "pilot_total_pn_to_ps", "pilot_lb_cod_mgcod_per_gvss",
@@ -205,7 +208,7 @@ colnames(ASRT_other_control) <- c("timestamp",
                                 "Control_Granule_percent")
 
 #select Control ecoli
-control_ecoli <- ecoli %>% select(timestamp, log_control_reduction)
+control_ecoli <- ecoli %>% select(timestamp, log_control_reduction, log_control_ecoli)
 control_factors <- left_join(control_ecoli, control_eps, by = "timestamp")
 colnames(control_factors) <- c("timestamp", "log_control_reduction", "control_total_cod_mgcod_per_gvss",
                   "control_total_pn_to_ps", "control_lb_cod_mgcod_per_gvss",
