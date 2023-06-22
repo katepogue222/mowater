@@ -1,0 +1,65 @@
+---
+title: "Hourly NAB2 Wrangling"
+author: "Kate Pogue"
+date: "2023-06-14"
+output: html_document
+---
+
+Loading Packages
+```{r}
+library(readxl)
+library(scales)
+library(lubridate)
+library(tidyverse)
+library(reshape2)
+```
+
+Loading Data
+```{r}
+getwd()
+hourly_NAB2 <- read_excel("data/hourly_NAB2.xlsx")
+```
+
+Wrangling
+```{r}
+new <- hourly_NAB2 %>% 
+  select(Shortname, Value, Timestamp)
+
+new <- new %>%
+  mutate(hour = hour(Timestamp))
+
+new <- new %>%
+  mutate(date = date(Timestamp))
+
+hourly <- new %>%
+  select(-Timestamp)
+
+colnames(hourly) <- c("name", "value", "hour", "date")
+```
+
+Some hourly plots
+```{r}
+unique(hourly$name)
+
+#diurnal variation in "AB2 INF FLOW (MGD)" 
+
+flow <- hourly %>%
+  filter(name %in% c("AB2 INF FLOW (MGD)", "AB9 INF FLOW (MGD)"))
+
+ggplot(flow, aes(x = hour, y = value, color = name)) +
+  geom_point() +
+  labs(x = "Hour", y = "Value") +
+  theme_minimal()
+
+
+sor <- hourly %>%
+  filter(name %in% c("Clarifier 2 SOR (gpd/sf)", "Clarifier 9 SOR (gpd/sf)", "Clarifier 10 SOR (gpd/sf)"))
+
+ggplot(sor, aes(x = hour, y = value, color = name)) +
+  geom_point(alpha = 0.4) +  
+  labs(x = "Hour", y = "Value") +
+  theme_minimal()
+
+
+```
+

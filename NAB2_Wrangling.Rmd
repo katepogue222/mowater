@@ -1,0 +1,210 @@
+---
+title: "First Wrangling for Metro_NAB2_DataRequest_20230507"
+author: "Kate Pogue"
+date: "2023-06-05"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Packages
+```{r}
+library(readxl)
+library(dplyr)
+library(scales)
+library(tidyr)
+library(ggplot2)
+library(shiny)
+library(lubridate)
+library(tidyverse)
+library(reshape2)
+```
+
+Loading Data
+```{r}
+getwd()
+NAB2_RAW <- read_excel("Metro_NAB2_DataRequest_20230507.xlsx")
+```
+
+Take a look at data
+```{r}
+summary(NAB2_RAW)
+titles <- unique(NAB2_RAW$Shortname)
+#there are 166 different measurements for each timestamp
+
+unique(NAB2_RAW$Category_1)
+#this column labeles each measurement as "Pilot," "Control," or "Full-Scale"
+
+unique(NAB2_RAW$Category_2)
+#this column labeles each measurement as "Online" or "Lab"
+
+unique(NAB2_RAW$Timestamp)
+summary(NAB2_RAW$Timestamp)
+length(NAB2_RAW$Timestamp)
+
+#43,856 timestamps for 166 different measurements
+
+length(NAB2_RAW$Timestamp)/166
+#not an even number there are likely different time windows for each measurement
+
+
+```
+
+
+Wrangling
+```{r}
+##redoing dates
+new_timestamps <- NAB2_RAW %>%
+  select(Timestamp, Shortname, Value)
+
+##choosing ONLY the date values 
+new_timestamps$Timestamp <- date(new_timestamps$Timestamp)
+
+##making each measurement a column with each observation organised by time
+NAB2_MID <- pivot_wider(new_timestamps, 
+                          names_from = Shortname, 
+                          values_from = Value)
+
+
+#remove Timestamp
+notime <- NAB2_MID %>% select(-Timestamp)
+
+#change NULL values to NA
+
+for (col in colnames(notime)) {
+  notime[[col]] <- ifelse(notime[[col]] == "NULL", NA, notime[[col]])
+}
+
+#make all columns numeric with a loop
+
+for (col in colnames(notime)) {
+  notime[[col]] <- as.numeric(sapply(notime[[col]], function(x) x[[1]]))
+}
+
+
+#put the converted values back in the dataframe
+NAB2 <- cbind(NAB2_MID$Timestamp, notime)
+
+#remove Nov. 6 
+NAB2 <- NAB2[-400,]
+
+#remove PWHS variable and AB2 Granule Mass Fraction (%) variable
+NAB2 <- NAB2 %>% select(-"NAB2 Clarifier Effluent PWHS (LAB) (mg/L)")
+NAB2 <- NAB2 %>% select(-"AB2 Granule Mass Fraction (%)")
+
+#figure out titles
+titles <- colnames((NAB2))
+
+#rename timestamp
+colnames(NAB2)[1] <- "timestamp"
+
+#save new dataset so I can use in other rmd files
+dir.create("/Users/katepogue/Desktop/MOWATER/data")
+write.csv(NAB2, file = "/Users/katepogue/Desktop/MOWATER/data/NAB2.csv", row.names = FALSE)
+```
+
+
+Descriptive Stats for my 4 E. coli variables
+```{r}
+#to get started on question 2, I'll make a timeseries for my 4 E. coli variables
+
+ecoli <- NAB2 %>% select(timestamp, "NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)", "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)", "NSI E. coli (LAB) (EC/100mL)", "NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)")
+
+# Specify the variables/columns to include in the boxplot
+variables <- c("NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)",
+               "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)",
+               "NSI E. coli (LAB) (EC/100mL)",
+               "NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)")
+
+# Create the boxplot
+boxplot(ecoli[, variables], 
+        main = "Boxplot of E. coli Variables",
+        ylab = "E. coli (EC/100mL)",
+        names = c("NAB2 Clar. Eff.", "NAB4 Clar. Eff.", "NSI", "NAB9 Clar. Eff."),
+        col = c("red", "blue", "green", "orange"),
+        outline = FALSE)
+
+# Make one with only the clarifier effluent variables/columns
+variables <- c("NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)",
+               "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)",
+               "NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)")
+
+# Create the boxplot
+boxplot(ecoli[, variables], 
+        main = "Boxplot of Clarifier Effluent E. coli Variables",
+        ylab = "E. coli (EC/100mL)",
+        names = c("NAB2 Clar. Eff.", "NAB4 Clar. Eff.", "NAB9 Clar. Eff."),
+        col = c("red", "blue", "orange"),
+        outline = FALSE)
+
+
+#make a stacked timeseries with y axes proportional to the range of each variable
+
+# Melt the dataset to create a long format
+melted_ecoli <- reshape2::melt(ecoli, id.vars = "timestamp")
+
+# Create the faceted time series plot with a free y-axis scale
+ggplot(melted_ecoli) +
+  geom_point(aes(x = timestamp, y = value, color = variable)) +
+  labs(x = "Timestamp", y = "E. coli (LAB) (EC/100mL)") +
+  scale_color_manual(values = c("NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)" = "red",
+                                "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)" = "blue",
+                                "NSI E. coli (LAB) (EC/100mL)" = "green",
+                                "NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)" = "orange")) +
+  facet_wrap(~ variable, scales = "free_y") +
+  theme_bw()
+
+```
+
+Descriptive Stats for 14 TSS variables
+```{r}
+#isolate the TSS variables
+
+tss<- NAB2 %>% select(timestamp, "NNE TSS (LAB) (mg/L)",
+                   "NAB2 Clarifier Effluent TSS (LAB) (mg/L)",
+                   "NSI TSS (LAB) (mg/L)",
+                   "NAB2 OF TSS (LAB) (mg/L)",
+                   "NAB2 UF TSS (LAB) (mg/L)",
+                   "NAB2 C-Pass TSS (LAB) (mg/L)",
+                   "NAB9 C-Pass TSS (LAB) (mg/L)",
+                   "WAS North Quad 1 and 3 TSS (LAB) (mg/L)",
+                   "NAB2 RAS TSS (LAB) (mg/L)",
+                   "GTE TSS (LAB) (mg/L)",
+                   "NSEC EFF TSS (mg/L)",
+                   "NSI TSS (mg/L)",
+                   "SC2 TSS (mg/L)")
+
+
+
+# Reshape the data from wide to long format
+tss_long <- pivot_longer(tss, -timestamp, names_to = "variable", values_to = "value")
+
+
+# Create the boxplot
+ggplot(tss_long, aes(x = factor(1), y = value, fill = variable)) +
+  geom_boxplot()  +
+  labs(x = NULL, y = "TSS (mg/L)", title = "Boxplot of TSS Variables") +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  facet_wrap(~ variable, scales = "free")
+
+
+#make a stacked timeseries with y axes proportional to the range of each variable
+
+
+ggplot(tss_long, aes(x = timestamp, y = value, color = variable)) +
+  geom_point() +
+  facet_wrap(~ variable, ncol = 4, scales = "free_y") +
+  scale_y_continuous(limits = c(0, NA), expand = c(0, 0), breaks = seq(0, 5000, by = 1000)) +
+  labs(x = "Date", y = "TSS (mg/L)", title = "Time Series of 13 TSS variables") +
+  theme_bw() +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1, vjust = 0.5),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+
+
+
+
