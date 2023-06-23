@@ -149,7 +149,7 @@ colnames(pilot_factors) <- c("timestamp", "log_pilot_reduction", "pilot_total_co
 
 
 #FILL method to fill in missing EPS and ASRT values
-pilot_eps_filled <- pilot_factors
+pilot_eps_filled <- pilot_factors[-c(1:7),]
 pilot_eps_filled <- left_join(pilot_eps_filled, others, by = "timestamp")
 pilot_eps_filled <- left_join(pilot_eps_filled, ASRT_main[,-3], by = "timestamp")
 pilot_eps_filled <- left_join(pilot_eps_filled, ASRT_other_pilot, by = "timestamp")
