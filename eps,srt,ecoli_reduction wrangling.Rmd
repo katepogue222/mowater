@@ -15,11 +15,7 @@ library(dplyr)
 library(olsrr)
 library(openxlsx)
 library(readxl)
-library(zoo)
-library(leaps)
-library(ggeffects)
-library(glmnet)
-library(gratia)
+library(lubridate)
 ```
 
 Loading Data
@@ -246,20 +242,141 @@ control_eps_removed <- na.omit(control_eps_removed)
 
 ```
 
+Combine Control and Pilot FIIL data with each system being a factorial variable
+```{r}
+#Combine for FILL data
+
+#remove column that the two sets don't have in common
+pilot_eps_filled <- pilot_eps_filled[, -which(names(pilot_eps_filled) == "NSI_TKNH_LAB_mg_per_L")]
+
+# Mutate 'system' variable to be a factor with all 2s for pilot and all 9s for control
+pilot_eps_filled <- pilot_eps_filled %>%
+  mutate(system = factor(rep(2, nrow(pilot_eps_filled))))
+
+control_eps_filled <- control_eps_filled %>%
+  mutate(system = factor(rep(9, nrow(control_eps_filled))))
+
+
+#change both dataframe names to match
+
+new_column_names <- c("timestamp", 
+                      "log_ecoli_reduction",
+                      "log_ecoli",
+                      "total_cod_mgcod_per_gvss",
+                      "total_pn_to_ps",
+                      "lb_cod_mgcod_per_gvss",
+                      "lb_proteins_mg_per_gvss",
+                      "lb_carbs_mg_per_gvss",   
+                      "tb_cod_mgcod_per_gvss",
+                      "tb_proteins_mg_per_gvss",
+                      "tb_carbs_mgcarb_per_gvss", 
+                      "tb_pn_to_ps",
+                      "ABXA_DO_mg_per_L",
+                      "ABXA_NO5_mgN_per_L",              
+                      "ABXA_NH3_mg_N_per_L",
+                      "ABXC_NH3_mg_N_per_L",             
+                      "NSI_TEMP_C", 
+                      "Clarifier_X_SLR_ppd_sf",          
+                      "ABX_INF_FLOW_MGD",                 
+                      "ABXA_AIRFLOW_SCFM",               
+                      "NSEC_ASRT",               
+                      "ASRT_d",                  
+                      "floc_SRT_d",               
+                      "granule_SRT_d",           
+                      "AGS_weighted_SRT_d",       
+                      "floc_percent",            
+                      "granule_percent",          
+                      "system"              
+                      )  # New column names
+
+pilot_eps_filled <- setNames(pilot_eps_filled, new_column_names)
+control_eps_filled <- setNames(control_eps_filled, new_column_names)
+
+# Stack the dataframes vertically and change column names
+all_eps_filled <- rbind(pilot_eps_filled, control_eps_filled)
+
+
+## add day of the year variable and day of the week variable
+all_eps_filled <- all_eps_filled %>%
+  mutate(
+    day_of_week = wday(timestamp, label = TRUE),
+    day_of_week = factor(day_of_week, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")),
+    month = month(timestamp, label = TRUE),
+    month = factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+  )
+```
+
+
+Combine Control and Pilot REMOVE data with each system being a factorial variable
+```{r}
+#remove column that the two sets don't have in common
+pilot_eps_removed <- pilot_eps_removed[, -which(names(pilot_eps_removed) == "NSI_TKNH_LAB_mg_per_L")]
+
+# Mutate 'system' variable to be a factor with all 2s for pilot and all 9s for control
+pilot_eps_removed <- pilot_eps_removed %>%
+  mutate(system = factor(rep(2, nrow(pilot_eps_removed))))
+
+control_eps_removed <- control_eps_removed %>%
+  mutate(system = factor(rep(9, nrow(control_eps_removed))))
+
+
+#change both dataframe names to match
+
+new_column_names <- c("timestamp", 
+                      "log_ecoli_reduction",
+                      "log_ecoli",
+                      "total_cod_mgcod_per_gvss",
+                      "total_pn_to_ps",
+                      "lb_cod_mgcod_per_gvss",
+                      "lb_proteins_mg_per_gvss",
+                      "lb_carbs_mg_per_gvss",   
+                      "tb_cod_mgcod_per_gvss",
+                      "tb_proteins_mg_per_gvss",
+                      "tb_carbs_mgcarb_per_gvss", 
+                      "tb_pn_to_ps",
+                      "ABXA_DO_mg_per_L",
+                      "ABXA_NO5_mgN_per_L",              
+                      "ABXA_NH3_mg_N_per_L",
+                      "ABXC_NH3_mg_N_per_L",             
+                      "NSI_TEMP_C", 
+                      "Clarifier_X_SLR_ppd_sf",          
+                      "ABX_INF_FLOW_MGD",                 
+                      "ABXA_AIRFLOW_SCFM",               
+                      "NSEC_ASRT",               
+                      "ASRT_d",                  
+                      "floc_SRT_d",               
+                      "granule_SRT_d",           
+                      "AGS_weighted_SRT_d",       
+                      "floc_percent",            
+                      "granule_percent",          
+                      "system"              
+                      )  # New column names
+
+pilot_eps_removed <- setNames(pilot_eps_removed, new_column_names)
+control_eps_removed <- setNames(control_eps_removed, new_column_names)
+
+# Stack the dataframes vertically and change column names
+all_eps_removed <- rbind(pilot_eps_removed, control_eps_removed)
+
+
+## add day of the year variable and day of the week variable
+all_eps_filled <- all_eps_filled %>%
+  mutate(
+    day_of_week = wday(timestamp, label = TRUE),
+    day_of_week = factor(day_of_week, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")),
+    month = month(timestamp, label = TRUE),
+    month = factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+  )
+```
+
 
 Export new dataframes as csv files
 ```{r}
-# Write Pilot FILLED
-write.csv(pilot_eps_filled, file = "/Users/katepogue/Desktop/git_mowater/data/pilot_eps_filled.csv", row.names = FALSE)
+# Write all FILLED
+write.csv(all_eps_filled, file = "/Users/katepogue/Desktop/git_mowater/data/all_eps_filled.csv", row.names = FALSE)
 
-# Write Pilot REMOVE
-write.csv(pilot_eps_removed, file = "/Users/katepogue/Desktop/git_mowater/data/pilot_eps_removed.csv", row.names = FALSE)
-
-# Write Control FILLED
-write.csv(control_eps_filled, file = "/Users/katepogue/Desktop/git_mowater/data/control_eps_filled.csv", row.names = FALSE)
-
-# Write Control REMOVED
-write.csv(control_eps_removed, file = "/Users/katepogue/Desktop/git_mowater/data/control_eps_removed.csv", row.names = FALSE)
+# Write all REMOVE
+write.csv(all_eps_removed, file = "/Users/katepogue/Desktop/git_mowater/data/all_eps_removed.csv", row.names = FALSE)
 
 ```
 

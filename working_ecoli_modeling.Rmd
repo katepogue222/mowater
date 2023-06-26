@@ -23,9 +23,9 @@ library(gratia)
 Loading Data
 ```{r}
 pilot_eps_filled <- read_csv("data/pilot_eps_filled.csv")
-pilot_eps_removed <- read_csv("data/pilot_eps_filled")
-control_eps_filled <- read_csv("data/control_eps_filled")
-control_eps_removed <- read_csv("data/control_eps_removed" )
+pilot_eps_removed <- read_csv("data/pilot_eps_filled.csv")
+control_eps_filled <- read_csv("data/control_eps_filled.csv")
+control_eps_removed <- read_csv("data/control_eps_removed.csv" )
 ```
 
 
@@ -67,6 +67,14 @@ heatmap(cor_matrix,
         xlab = "Variables",
         ylab = "Variables")
 
+# Add color scale legend
+legend("right",
+       legend = c(min(cor_matrix), max(cor_matrix)),
+       fill = colorRampPalette(c("blue", "white", "red"))(2),
+       title = "Correlation",
+       cex = 0.8,
+       box.col = NA)
+
 ```
 
 
@@ -83,7 +91,7 @@ train <- pilot_eps_filled[n,] #Creating Training data
 test <- pilot_eps_filled[-n,] #Creating Testing data
 
 #fitting full model
-mod_full <- lm(data = train[, ], log_pilot_reduction~.)
+mod_full <- lm(data = train[, ], log_pilot_ecoli~.)
 
 #using ols_step_all to get all predictor variables possibilities
 subset <- ols_step_all_possible(mod_full) |> as_tibble()
@@ -102,24 +110,24 @@ l <- lapply(1:nrow(subset), function(i){
   
   predictors <- subset$predictors[i] |> str_split(" ") #getting predictor variables
   
-  #Creating tibble with log_pilot_reduction as first column
-  tb <- tibble("log_pilot_reduction" = train$log_pilot_reduction)
+  #Creating tibble with log_pilot_ecoli as first column
+  tb <- tibble("log_pilot_ecoli" = train$log_pilot_ecoli)
 
   #Adding each variable to the tibble
   for (j in 1:length(predictors[[1]])) {
   
   tb[,1+j] <- get(predictors[[1]][j])
-  colnames(tb) <- c("log_pilot_reduction", predictors[[1]])
+  colnames(tb) <- c("log_pilot_ecoli", predictors[[1]])
   }
 
-  mod <- lm(data = tb, log_pilot_reduction ~.) #Fitting model with variables selected through the loop
+  mod <- lm(data = tb, log_pilot_ecoli ~.) #Fitting model with variables selected through the loop
   
   pred <- predict(mod, newdata = test) #Computing the model predictions
-  rmse <- rmse(test$log_pilot_reduction, pred) #Computing the model RMSE
+  rmse <- rmse(test$log_pilot_ecoli, pred) #Computing the model RMSE
   
   # Allocating Model Selection criteria to the list
   list("predictors" = subset$predictors[i] |> unlist(), 
-       "rmse" = rmse(test$log_pilot_reduction, pred), 
+       "rmse" = rmse(test$log_pilot_ecoli, pred), 
        "adjr" = summary(mod)$adj.r.squared
        )
 }
@@ -143,7 +151,7 @@ rm(i, l)
 subset_all |> 
   arrange(rmse)
 
-mean(test$log_pilot_reduction)
+mean(test$log_pilot_ecoli)
 
 #Creating Table of top 3 models combined with our model of interest
 table <- subset_all |> 
@@ -169,7 +177,7 @@ table |>
 Take some of the FILLED models and map data with the model
 ```{r}
 # Fit the linear regression model
-model <- lm(log_pilot_reduction ~ `AB2A_DO_mg_per_L` + `NSI_TEMP_C` + `AB2_INF_FLOW_MGD` + `Pilot_Floc_SRT_d`, data = pilot_eps_filled)
+model <- lm(log_pilot_ecoli ~ `AB2A_DO_mg_per_L` + `NSI_TEMP_C` + `AB2_INF_FLOW_MGD` + `Pilot_Floc_SRT_d`, data = pilot_eps_filled)
 summary(model)
 plot(model)
 ```
@@ -189,7 +197,7 @@ test <- pilot_eps_filled[-n,] #Creating Testing data
 
 # Convert the predictors and outcome variables to matrices
 x <- as.matrix(train[, -1])
-y <- train$log_pilot_reduction
+y <- train$log_pilot_ecoli
 
 # Fit the Lasso regression model
 ridge_model <- cv.glmnet(x, y, alpha = 1, nfolds = 10)
@@ -213,7 +221,7 @@ train <- pilot_eps_removed[n,] #Creating Training data
 test <- pilot_eps_removed[-n,] #Creating Testing data
 
 #fitting full model
-mod_full <- lm(data = train[, c(2:15)], log_pilot_reduction~.)
+mod_full <- lm(data = train[, c(2:15)], log_pilot_ecoli~.)
 
 #using ols_step_all to get all predictor variables possibilities
 subset <- ols_step_all_possible(mod_full) |> as_tibble()
@@ -229,24 +237,24 @@ l <- lapply(1:nrow(subset), function(i){
   
   predictors <- subset$predictors[i] |> str_split(" ") #getting predictor variables
   
-  #Creating tibble with log_pilot_reduction as first column
-  tb <- tibble("log_pilot_reduction" = train$log_pilot_reduction)
+  #Creating tibble with log_pilot_ecoli as first column
+  tb <- tibble("log_pilot_ecoli" = train$log_pilot_ecoli)
 
   #Adding each variable to the tibble
   for (j in 1:length(predictors[[1]])) {
   
   tb[,1+j] <- get(predictors[[1]][j])
-  colnames(tb) <- c("log_pilot_reduction", predictors[[1]])
+  colnames(tb) <- c("log_pilot_ecoli", predictors[[1]])
   }
 
-  mod <- lm(data = tb, log_pilot_reduction ~.) #Fitting model with variables selected through the loop
+  mod <- lm(data = tb, log_pilot_ecoli ~.) #Fitting model with variables selected through the loop
   
   pred <- predict(mod, newdata = test) #Computing the model predictions
-  rmse <- rmse(test$log_pilot_reduction, pred) #Computing the model RMSE
+  rmse <- rmse(test$log_pilot_ecoli, pred) #Computing the model RMSE
   
   # Allocating Model Selection criteria to the list
   list("predictors" = subset$predictors[i] |> unlist(), 
-       "rmse" = rmse(test$log_pilot_reduction, pred), 
+       "rmse" = rmse(test$log_pilot_ecoli, pred), 
        "adjr" = summary(mod)$adj.r.squared
        )
 }
@@ -268,7 +276,7 @@ for (i in 1:nrow(subset)) {
 subset_all |> 
   arrange(rmse)
 
-mean(test$log_pilot_reduction)
+mean(test$log_pilot_ecoli)
 
 #Creating Table of top 3 models combined with our model of interest
 table <- subset_all |> 
