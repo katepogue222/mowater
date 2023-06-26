@@ -360,7 +360,7 @@ all_eps_removed <- rbind(pilot_eps_removed, control_eps_removed)
 
 
 ## add day of the year variable and day of the week variable
-all_eps_filled <- all_eps_filled %>%
+all_eps_removed <- all_eps_removed %>%
   mutate(
     day_of_week = wday(timestamp, label = TRUE),
     day_of_week = factor(day_of_week, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")),

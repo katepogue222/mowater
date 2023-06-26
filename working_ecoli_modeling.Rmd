@@ -22,82 +22,60 @@ library(gratia)
 
 Loading Data
 ```{r}
-pilot_eps_filled <- read_csv("data/pilot_eps_filled.csv")
-pilot_eps_removed <- read_csv("data/pilot_eps_filled.csv")
-control_eps_filled <- read_csv("data/control_eps_filled.csv")
-control_eps_removed <- read_csv("data/control_eps_removed.csv" )
+all_eps_filled <- read_csv("data/all_eps_filled.csv")
+all_eps_removed <- read_csv("data/all_eps_removed.csv")
 ```
 
 
 Make a heatmap of the FILL method data
 ```{r}
-#for filled pilot
-cor_matrix <- cor(pilot_eps_filled[,-1])
+#for filled 
+cor_matrix <- cor(all_eps_filled[,-c(1, 28, 29, 30)])
 
 heatmap(cor_matrix, 
         col = colorRampPalette(c("blue", "white", "red"))(100),  # Choose a color palette
-        main = "Filled Pilot Correlation Heatmap",
+        main = "Filled Correlation Heatmap",
         xlab = "Variables",
         ylab = "Variables")
 
-#for removed pilot
-cor_matrix <- cor(pilot_eps_removed[,-1])
+correlations <- cor(all_eps_filled[, -c(1,2,28:30)], all_eps_filled[, 2])
+
+#for removed
+cor_matrix <- cor(all_eps_removed[,-c(1, 28, 29, 30)])
 
 heatmap(cor_matrix, 
         col = colorRampPalette(c("blue", "white", "red"))(100),  # Choose a color palette
-        main = "Removed Pilot Correlation Heatmap",
+        main = "Removed Correlation Heatmap",
         xlab = "Variables",
         ylab = "Variables")
 
-#for filled control
-cor_matrix <- cor(control_eps_filled[,-1])
-
-heatmap(cor_matrix, 
-        col = colorRampPalette(c("blue", "white", "red"))(100),  # Choose a color palette
-        main = "Filled Control Correlation Heatmap",
-        xlab = "Variables",
-        ylab = "Variables")
-
-#for removed control
-cor_matrix <- cor(control_eps_removed[,-1])
-
-heatmap(cor_matrix, 
-        col = colorRampPalette(c("blue", "white", "red"))(100),  # Choose a color palette
-        main = "Removed Control Correlation Heatmap",
-        xlab = "Variables",
-        ylab = "Variables")
-
-# Add color scale legend
-legend("right",
-       legend = c(min(cor_matrix), max(cor_matrix)),
-       fill = colorRampPalette(c("blue", "white", "red"))(2),
-       title = "Correlation",
-       cex = 0.8,
-       box.col = NA)
 
 ```
 
 
 
-Pilot: Fit and test model for FILL method
+Fit and test model for FILL method
 ```{r}
+#view(colnames(all_eps_filled))
+
 #make testing and training dataset
 set.seed(1)
 split_per <- .8 #Setting Trainging Size
 
-n <- sample(x = nrow(pilot_eps_filled), size = ceiling(split_per*nrow(pilot_eps_filled))) #Getting Training observation indexes
+n <- sample(x = nrow(all_eps_filled), size = ceiling(split_per*nrow(all_eps_filled))) #Getting Training observation indexes
 
-train <- pilot_eps_filled[n,] #Creating Training data
-test <- pilot_eps_filled[-n,] #Creating Testing data
+train <- all_eps_filled[n,] #Creating Training data
+test <- all_eps_filled[-n,] #Creating Testing data
 
 #fitting full model
-mod_full <- lm(data = train[, ], log_pilot_ecoli~.)
+mod_full <- lm(data = train[,c(3:10,27:30)], log_ecoli~.)
+plot(mod_full)
 
 #using ols_step_all to get all predictor variables possibilities
 subset <- ols_step_all_possible(mod_full) |> as_tibble()
 
 
-#attaching pilot_eps_filled to environment
+#attaching all_eps_filled to environment
 suppressMessages(attach(train))
 
 #Allocating tibble for looping
@@ -110,24 +88,24 @@ l <- lapply(1:nrow(subset), function(i){
   
   predictors <- subset$predictors[i] |> str_split(" ") #getting predictor variables
   
-  #Creating tibble with log_pilot_ecoli as first column
-  tb <- tibble("log_pilot_ecoli" = train$log_pilot_ecoli)
+  #Creating tibble with log_ecoli as first column
+  tb <- tibble("log_ecoli" = train$log_ecoli)
 
   #Adding each variable to the tibble
   for (j in 1:length(predictors[[1]])) {
   
   tb[,1+j] <- get(predictors[[1]][j])
-  colnames(tb) <- c("log_pilot_ecoli", predictors[[1]])
+  colnames(tb) <- c("log_ecoli", predictors[[1]])
   }
 
-  mod <- lm(data = tb, log_pilot_ecoli ~.) #Fitting model with variables selected through the loop
+  mod <- lm(data = tb, log_ecoli ~.) #Fitting model with variables selected through the loop
   
   pred <- predict(mod, newdata = test) #Computing the model predictions
-  rmse <- rmse(test$log_pilot_ecoli, pred) #Computing the model RMSE
+  rmse <- rmse(test$log_ecoli, pred) #Computing the model RMSE
   
   # Allocating Model Selection criteria to the list
   list("predictors" = subset$predictors[i] |> unlist(), 
-       "rmse" = rmse(test$log_pilot_ecoli, pred), 
+       "rmse" = rmse(test$log_ecoli, pred), 
        "adjr" = summary(mod)$adj.r.squared
        )
 }
@@ -142,27 +120,26 @@ for (i in 1:nrow(subset)) {
   subset_all[i,3] <- l[[i]][3]
 }
 
-detach(train) #detaching pilot_eps_filled from environment 
+detach(train) #detaching all_eps_filled from environment 
 rm(i, l)
 
 
 ##Look at results
 
 subset_all |> 
-  arrange(rmse)
+   arrange(desc(adjr))
 
-mean(test$log_pilot_ecoli)
 
-#Creating Table of top 3 models combined with our model of interest
+#Creating Table of top models combined with our model of interest
 table <- subset_all |> 
-  arrange(rmse) |> 
+   arrange(desc(adjr)) |> 
   rbind( # Combining the models into tabular form
     subset_all 
   ) |> 
   #Renaming and formatting the variables for table presentation
   select(predictors, rmse, adjr) |> 
   transmute("Predictor Variables" = str_replace_all(predictors, pattern = " ", replacement = ", "),
-            "RMSE" = round(rmse, 1)|> format(format = "d", big.mark = ","),
+            "RMSE" = round(rmse, 3)|> format(format = "d", big.mark = ","),
             "Adj.R2" = round(adjr, 3)) |> 
   as.matrix(nrow = 4, ncol = 4)
 
@@ -177,27 +154,27 @@ table |>
 Take some of the FILLED models and map data with the model
 ```{r}
 # Fit the linear regression model
-model <- lm(log_pilot_ecoli ~ `AB2A_DO_mg_per_L` + `NSI_TEMP_C` + `AB2_INF_FLOW_MGD` + `Pilot_Floc_SRT_d`, data = pilot_eps_filled)
+model <- lm(log_ecoli ~ `ABXA_DO_mg_per_L` + `NSI_TEMP_C` + `ABX_INF_FLOW_MGD` + `Floc_SRT_d`, data = all_eps_filled)
 summary(model)
 plot(model)
 ```
 
-Try ridge regression for FILL method
+Try lasso regression for FILL method
 ```{r}
 
 #make testing and training dataset
 set.seed(1)
 split_per <- .8 #Setting Trainging Size
 
-n <- sample(x = nrow(pilot_eps_filled), size = ceiling(split_per*nrow(pilot_eps_filled))) #Getting Training observation indexes
+n <- sample(x = nrow(all_eps_filled), size = ceiling(split_per*nrow(all_eps_filled))) #Getting Training observation indexes
 
-train <- pilot_eps_filled[n,] #Creating Training data
-test <- pilot_eps_filled[-n,] #Creating Testing data
+train <- all_eps_filled[n,] #Creating Training data
+test <- all_eps_filled[-n,] #Creating Testing data
 
 
 # Convert the predictors and outcome variables to matrices
 x <- as.matrix(train[, -1])
-y <- train$log_pilot_ecoli
+y <- train$log_ecoli
 
 # Fit the Lasso regression model
 ridge_model <- cv.glmnet(x, y, alpha = 1, nfolds = 10)
@@ -209,19 +186,19 @@ plot(ridge_model)
 ```
 
 
-Pilot: Fit and test model for REMOVE method
+Fit and test model for REMOVE method
 ```{r}
 #make testing and training dataset
 set.seed(1)
 split_per <- .8 #Setting Trainging Size
 
-n <- sample(x = nrow(pilot_eps_removed), size = ceiling(split_per*nrow(pilot_eps_removed))) #Getting Training observation indexes
+n <- sample(x = nrow(all_eps_removed), size = ceiling(split_per*nrow(all_eps_removed))) #Getting Training observation indexes
 
-train <- pilot_eps_removed[n,] #Creating Training data
-test <- pilot_eps_removed[-n,] #Creating Testing data
+train <- all_eps_removed[n,] #Creating Training data
+test <- all_eps_removed[-n,] #Creating Testing data
 
 #fitting full model
-mod_full <- lm(data = train[, c(2:15)], log_pilot_ecoli~.)
+mod_full <- lm(data = train[, c(2:15)], log_ecoli~.)
 
 #using ols_step_all to get all predictor variables possibilities
 subset <- ols_step_all_possible(mod_full) |> as_tibble()
@@ -237,24 +214,24 @@ l <- lapply(1:nrow(subset), function(i){
   
   predictors <- subset$predictors[i] |> str_split(" ") #getting predictor variables
   
-  #Creating tibble with log_pilot_ecoli as first column
-  tb <- tibble("log_pilot_ecoli" = train$log_pilot_ecoli)
+  #Creating tibble with log_ecoli as first column
+  tb <- tibble("log_ecoli" = train$log_ecoli)
 
   #Adding each variable to the tibble
   for (j in 1:length(predictors[[1]])) {
   
   tb[,1+j] <- get(predictors[[1]][j])
-  colnames(tb) <- c("log_pilot_ecoli", predictors[[1]])
+  colnames(tb) <- c("log_ecoli", predictors[[1]])
   }
 
-  mod <- lm(data = tb, log_pilot_ecoli ~.) #Fitting model with variables selected through the loop
+  mod <- lm(data = tb, log_ecoli ~.) #Fitting model with variables selected through the loop
   
   pred <- predict(mod, newdata = test) #Computing the model predictions
-  rmse <- rmse(test$log_pilot_ecoli, pred) #Computing the model RMSE
+  rmse <- rmse(test$log_ecoli, pred) #Computing the model RMSE
   
   # Allocating Model Selection criteria to the list
   list("predictors" = subset$predictors[i] |> unlist(), 
-       "rmse" = rmse(test$log_pilot_ecoli, pred), 
+       "rmse" = rmse(test$log_ecoli, pred), 
        "adjr" = summary(mod)$adj.r.squared
        )
 }
@@ -276,7 +253,7 @@ for (i in 1:nrow(subset)) {
 subset_all |> 
   arrange(rmse)
 
-mean(test$log_pilot_ecoli)
+mean(test$log_ecoli)
 
 #Creating Table of top 3 models combined with our model of interest
 table <- subset_all |> 
@@ -298,3 +275,99 @@ table |>
 
 ```
 
+
+
+Control: Fit Model for REMOVE
+
+```{r}
+#view(colnames(control_eps_removed))
+
+#make testing and training dataset
+set.seed(1)
+split_per <- .8 #Setting Trainging Size
+
+n <- sample(x = nrow(control_eps_removed), size = ceiling(split_per*nrow(control_eps_removed))) #Getting Training observation indexes
+
+train <- control_eps_removed[n,] #Creating Training data
+test <- control_eps_removed[-n,] #Creating Testing data
+
+#fitting full model
+mod_full <- lm(data = train[,-1], log_control_ecoli~.)
+
+#using ols_step_all to get all predictor variables possibilities
+subset <- ols_step_all_possible(mod_full) |> as_tibble()
+
+
+#attaching control_eps_removed to environment
+suppressMessages(attach(train))
+
+#Allocating tibble for looping
+subset_all <- tibble("predictors" = rep(NA, times = nrow(subset)),
+             "rmse" = rep(NA, times = nrow(subset)),
+             "adjr" = rep(NA, times = nrow(subset)))
+
+#Creating list of all model possibilities
+l <- lapply(1:nrow(subset), function(i){
+  
+  predictors <- subset$predictors[i] |> str_split(" ") #getting predictor variables
+  
+  #Creating tibble with log_control_ecoli as first column
+  tb <- tibble("log_control_ecoli" = train$log_control_ecoli)
+
+  #Adding each variable to the tibble
+  for (j in 1:length(predictors[[1]])) {
+  
+  tb[,1+j] <- get(predictors[[1]][j])
+  colnames(tb) <- c("log_control_ecoli", predictors[[1]])
+  }
+
+  mod <- lm(data = tb, log_control_ecoli ~.) #Fitting model with variables selected through the loop
+  
+  pred <- predict(mod, newdata = test) #Computing the model predictions
+  rmse <- rmse(test$log_control_ecoli, pred) #Computing the model RMSE
+  
+  # Allocating Model Selection criteria to the list
+  list("predictors" = subset$predictors[i] |> unlist(), 
+       "rmse" = rmse(test$log_control_ecoli, pred), 
+       "adjr" = summary(mod)$adj.r.squared
+       )
+}
+)
+
+#Extracting the information from the list into a data frame 
+#by looping through the list so we can easily compare models
+for (i in 1:nrow(subset)) {
+  
+  subset_all[i,1] <- l[[i]][1]
+  subset_all[i,2] <- l[[i]][2]
+  subset_all[i,3] <- l[[i]][3]
+}
+
+detach(train) #detaching control_eps_removed from environment 
+rm(i, l)
+
+
+##Look at results
+
+subset_all |> 
+   arrange(desc(adjr))
+
+
+#Creating Table of top 3 models combined with our model of interest
+table <- subset_all |> 
+   arrange(desc(adjr)) |> 
+  rbind( # Combining the models into tabular form
+    subset_all 
+  ) |> 
+  #Renaming and formatting the variables for table presentation
+  select(predictors, rmse, adjr) |> 
+  transmute("Predictor Variables" = str_replace_all(predictors, pattern = " ", replacement = ", "),
+            "RMSE" = round(rmse, 3)|> format(format = "d", big.mark = ","),
+            "Adj.R2" = round(adjr, 3)) |> 
+  as.matrix(nrow = 4, ncol = 4)
+
+
+table |> 
+  knitr::kable(caption = "E. coli Regression Models for Filled dataset") #Creating table
+
+```
