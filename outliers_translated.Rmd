@@ -17,7 +17,7 @@ library("tidyverse")
 
 loading data
 ```{r}
-mergedDF <- read_csv("data/NAB2.csv")
+mergedDF <- read_csv("data/NAB2_NEW.csv")
 ```
 
 Wrangle my own dataframe
@@ -100,6 +100,7 @@ for (i in colnames(mergedDF)) {
     mergedDF[m, (n) := NA]
   }
 }
+
 
 ```
 

@@ -1,0 +1,99 @@
+---
+title: "NEW_NAB2_wrangling"
+author: "Kate Pogue"
+date: "2023-06-27"
+output: html_document
+---
+
+
+Loading Packages
+```{r}
+library(readr)
+library(dplyr)
+library(scales)
+library(tidyr)
+library(ggplot2)
+library(shiny)
+library(lubridate)
+library(tidyverse)
+library(reshape2)
+```
+
+Loading Data
+```{r}
+NAB2_NEW <- read_csv("data/NAB2_VER2.csv")
+```
+
+Take a look at data
+```{r}
+titles <- unique(NAB2_NEW$Shortname)
+#there are 166 different measurements for each timestamp
+#17 NEW VARIABLES
+
+unique(NAB2_NEW$Category_1)
+#this column labeles each measurement as "Pilot," "Control," or "Full-Scale"
+
+unique(NAB2_NEW$Category_2)
+#this column labeles each measurement as "Online" or "Lab"
+
+unique(NAB2_NEW$Timestamp)
+summary(NAB2_NEW$Timestamp)
+length(NAB2_NEW$Timestamp)
+
+```
+
+
+Wrangling
+```{r}
+##redoing dates
+new_timestamps <- NAB2_NEW %>%
+  select(Timestamp, Shortname, Value)
+
+##choosing ONLY the date values 
+new_timestamps$Timestamp <- mdy(new_timestamps$Timestamp)
+
+##making each measurement a column with each observation organised by time
+NAB2_MID <- pivot_wider(new_timestamps, 
+                          names_from = Shortname, 
+                          values_from = Value)
+
+
+#remove Timestamp
+notime <- NAB2_MID %>% select(-Timestamp)
+
+#change NULL values to NA
+
+for (col in colnames(notime)) {
+  notime[[col]] <- ifelse(notime[[col]] == "NULL", NA, notime[[col]])
+}
+
+#make all columns numeric with a loop
+
+for (col in colnames(notime)) {
+  notime[[col]] <- as.numeric(sapply(notime[[col]], function(x) x[[1]]))
+}
+
+
+#put the converted values back in the dataframe
+NAB2 <- cbind(NAB2_MID$Timestamp, notime)
+
+#remove Nov. 6 
+NAB2 <- NAB2[-436,]
+
+#remove PWHS variable and AB2 Granule Mass Fraction (%) variable
+NAB2 <- NAB2 %>% select(-"NAB2 Clarifier Effluent PWHS (LAB) (mg/L)")
+NAB2 <- NAB2 %>% select(-"AB2 Granule Mass Fraction (%)")
+
+#figure out titles
+titles <- colnames((NAB2))
+titles
+
+#rename timestamp
+colnames(NAB2)[1] <- "timestamp"
+
+#save new dataset so I can use in other rmd files
+dir.create("/Users/katepogue/Desktop/MOWATER/data")
+write.csv(NAB2, file = "/Users/katepogue/Desktop/git_mowater/data/NAB2_NEW.csv", row.names = FALSE)
+```
+
+
