@@ -20,7 +20,7 @@ library(lubridate)
 
 Loading Data
 ```{r}
-NAB2 <- read_csv("data/NAB2_NEW.csv")
+NAB2 <- read_csv("data/NAB2_VER3.csv")
 EPS <- read_excel("data/all_EPS.xlsx")
 ASRT_main <- read_excel("data/ASRT_main.xlsx")
 ASRT_other <- read_excel("data/ASRT_other.xlsx")
@@ -293,6 +293,8 @@ others <- NAB2 %>% select(timestamp,
 ,"NAB4 C-Pass dSVI 5 (mL/g)"
 ,"NAB9 C-Pass dSVI 5 (mL/g)"
 ,"NAB4 C-Pass TSS (LAB) (mg/L)"
+,"NAB4 C-Pass VSS (LAB) (mg/L)"
+,"NAB4 C-Pass Total COD (LAB) (mg/L)"
 ,"AB4A NO5 (mg N/L)"
 ,"AB4A NH3 (mg N/L)" 
 ,"AB4C NH3 (mg N/L)" 
@@ -428,14 +430,37 @@ others <- mutate(others, "AB4 and 9 MLR FLOW (MGD)" =
 others$'AB4 and 9 MLR FLOW (MGD)'[others$'AB4 and 9 MLR FLOW (MGD)' == 0] <- NA
 others <- others %>% select(-'AB4 MLR FLOW (MGD)', -'AB9 MLR FLOW (MGD)')
 
+#C-Pass VSS
+
+others$`NAB4 C-Pass VSS (LAB) (mg/L)`[is.na(others$`NAB4 C-Pass VSS (LAB) (mg/L)`)] <- 0
+others$`NAB9 C-Pass VSS (LAB) (mg/L)`[is.na(others$`NAB9 C-Pass VSS (LAB) (mg/L)`)] <- 0
+
+others <- mutate(others, "NAB4 and 9 C-Pass VSS (LAB) (mg/L)" = 
+              (others$`NAB4 C-Pass VSS (LAB) (mg/L)` + others$`NAB9 C-Pass VSS (LAB) (mg/L)`))
+
+others$'NAB4 and 9 C-Pass VSS (LAB) (mg/L)'[others$'NAB4 and 9 C-Pass VSS (LAB) (mg/L)' == 0] <- NA
+others <- others %>% select(-'NAB4 C-Pass VSS (LAB) (mg/L)', -'NAB9 C-Pass VSS (LAB) (mg/L)')
+
+#C-Pass total COD
+
+
+others$`NAB4 C-Pass Total COD (LAB) (mg/L)`[is.na(others$`NAB4 C-Pass Total COD (LAB) (mg/L)`)] <- 0
+others$`NAB9 C-Pass Total COD (LAB) (mg/L)`[is.na(others$`NAB9 C-Pass Total COD (LAB) (mg/L)`)] <- 0
+
+others <- mutate(others, "NAB4 and 9 C-Pass Total COD (LAB) (mg/L)" = 
+              (others$`NAB4 C-Pass Total COD (LAB) (mg/L)` + others$`NAB9 C-Pass Total COD (LAB) (mg/L)`))
+
+others$'NAB4 and 9 C-Pass Total COD (LAB) (mg/L)'[others$'NAB4 and 9 C-Pass Total COD (LAB) (mg/L)' == 0] <- NA
+others <- others %>% select(-'NAB4 C-Pass Total COD (LAB) (mg/L)', -'NAB9 C-Pass Total COD (LAB) (mg/L)')
+
 
 
 colnames(others) <- new_names_vector <- c(
   "timestamp",
   "CLARIFIER_9_SLR",
   "CLARIFIER_9_SOR",
-  "NAB9_CPASS_TOTAL_COD",
-  "NAB9_CPASS_VSS",
+  "NAB4_and_9_CPASS_TOTAL_COD",
+  "NAB4_and_9_CPASS_VSS",
   "AB9A_DO",
   "AB9B_DO",
   "AB9C_DO",
@@ -471,10 +496,10 @@ others <- others %>%
     timestamp,
     CLARIFIER_9_SLR,
     CLARIFIER_9_SOR,
-    NAB9_CPASS_TOTAL_COD,
+    NAB4_and_9_CPASS_TOTAL_COD,
     NAB4_and_9_CPASS_TKNH,
     NAB4_and_9_CPASS_TSS,
-    NAB9_CPASS_VSS,
+    NAB4_and_9_CPASS_VSS,
     AB9A_DO,
     AB9B_DO,
     AB9C_DO,
@@ -659,10 +684,11 @@ all_eps_filled$timestamp <- as.Date(all_eps_filled$timestamp, format = "%Y/%m/%d
 all_eps_filled <- all_eps_filled %>%
   mutate(
     day_of_week = wday(timestamp),
-    day_of_week = factor(day_of_week, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")),
+    day_of_week = factor(day_of_week),
     month = month(timestamp),
-    month = factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+    month = factor(month)
   )
+
 ```
 
 
@@ -775,16 +801,15 @@ all_eps_removed$timestamp <- as.Date(all_eps_removed$timestamp, format = "%Y/%m/
 all_eps_removed <- all_eps_removed %>%
   mutate(
     day_of_week = wday(timestamp),
-    day_of_week = factor(day_of_week, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")),
+    day_of_week = factor(day_of_week),
     month = month(timestamp),
-    month = factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+    month = factor(month )
   )
 ```
 
 
 Export dataframes as CSV files
 ```{r}
-getwd()
 write.csv(all_eps_filled, file = "data/all_eps_filled.csv", row.names = FALSE)
 
 write.csv(all_eps_removed, file = "data/all_eps_removed.csv", row.names = FALSE)

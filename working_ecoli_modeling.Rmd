@@ -29,25 +29,28 @@ all_eps_removed <- read_csv("data/all_eps_removed.csv")
 
 Make a heatmap of the FILL method data
 ```{r}
+
 #for filled 
-cor_matrix <- cor(all_eps_filled[,-c(1, 28, 29, 30)])
+
+cor_matrix <- cor(all_eps_filled[,-c(1, 77:79)])
 
 heatmap(cor_matrix, 
         col = colorRampPalette(c("blue", "white", "red"))(100),  # Choose a color palette
-        main = "Filled Correlation Heatmap",
-        xlab = "Variables",
-        ylab = "Variables")
+        main = "Correlation Heatmap for All 'Filled' Variables",
+        xlab = "",
+        ylab = "")
 
-correlations <- cor(all_eps_filled[, -c(1,2,28:30)], all_eps_filled[, 2])
+
+correlations <- cor(all_eps_filled[, -c(1,2,77:79)], all_eps_filled[, 2])
 
 #for removed
-cor_matrix <- cor(all_eps_removed[,-c(1, 28, 29, 30)])
+cor_matrix <- cor(all_eps_removed[,-c(1, 77:79)])
 
 heatmap(cor_matrix, 
         col = colorRampPalette(c("blue", "white", "red"))(100),  # Choose a color palette
-        main = "Removed Correlation Heatmap",
-        xlab = "Variables",
-        ylab = "Variables")
+        main = "Correlation Heatmap for All 'Removed' Variables",
+        xlab = "",
+        ylab = "")
 
 
 ```
@@ -55,29 +58,33 @@ heatmap(cor_matrix,
 
 
 
-Try lasso regression for FILL method
+Try lasso regression for FILL levels
 ```{r}
 
 #make testing and training dataset
-set.seed(793)
-split_per <- .7 #Setting Trainging Size
+set.seed(61)
+split_per <- .8 #Setting Trainging Size
 
 n <- sample(x = nrow(all_eps_filled), size = ceiling(split_per*nrow(all_eps_filled))) #Getting Training observation indexes
 
 train <- all_eps_filled[n,] #Creating Training data
 test <- all_eps_filled[-n,] #Creating Testing data
 
-
 #make dummy variables for month and weekday (not for system bc it will not be fed into the model)
-train$month <- factor(train$month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
 month_dummy <- model.matrix(~ month - 1, data = train)
 day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = train)
 
 #attach dummies to train
-x <- cbind(as.matrix(train[, 4:27]), month_dummy, day_of_week_dummy)
-y <- train$log_ecoli #outcome variable
+x <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
+y <- train$log_ecoli # outcome variable
 cv_model <- cv.glmnet(x, y, alpha = 1, family = "gaussian")
+
+
+# Plot with title
 plot(cv_model)
+
+
+
 
 #Extract Optimal Lambda
 opt_lambda <- cv_model$lambda.1se
@@ -87,28 +94,354 @@ coef(lasso_model)
 
 #Predict on the test set
 
-levels_all <- levels(train$month)  # Get all levels of `month` variable from the training data
-month_dummy <- model.matrix(~ month - 1, data = test, levels = levels_all)
-day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = test)
+#levels_all <- levels(train$month)  # Get all levels of `month` variable from the training data
+#month_dummy <- model.matrix(~ month - 1, data = test, levels = levels_all)
+#day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = test)
 
-x_test <- cbind(as.matrix(test[, 4:27]), month_dummy, day_of_week_dummy)
+x_test <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
 y_pred <- predict(lasso_model, newx = x_test)
 
 
 # Example: Calculate mean squared error
 mse <- mean((test$log_ecoli - y_pred)^2)
 
+
+#visualize
+time <- train$timestamp
+floc <- train$Floc_percent
+# Predict the response variable using the Lasso model
+predicted_values <- predict(lasso_model, newx = x)
+
+
+# Plot the observed values over time
+plot(time, y, pch = 16, col = "#42CEB3", xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
+
+# Add the Lasso predictions over time
+points(time, predicted_values, pch = 16, col = "#710C66")
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Concentration over Time")
+
+# Add legend
+legend("bottomleft", legend = c("Observed", "Predicted"), pch = 16, col = c("#42CEB3", "#710C66"))
+
+
+
+
+# Create color vectors based on "system" variable
+obs_color <- ifelse(system == 2, "#42CEB3", "#D95E4F")
+pred_color <- ifelse(system == 2, "#E4A458", "#710C66")
+
+# Plot the observed values over time with color differentiation based on "system"
+plot(time, y, pch = 16, col = obs_color, xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
+
+# Add the Lasso predictions over time with color differentiation based on "system"
+points(time, predicted_values, pch = 16, col = pred_color)
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Concentration over Time")
+
+# Move the legend to the outside
+legend("bottomleft", legend = c("Observed Pilot", "Observed Control", "Predicted Pilot", "Predicted Control"),
+       pch = 16, col = c("#42CEB3", "#D95E4F", "#E4A458", "#710C66"), bty = "n")
+
+
+
+
+
+# Predict the response variable using the Lasso model
+predicted_values <- predict(lasso_model, newx = x)
+
+# Calculate R-squared
+rss <- sum((y - predicted_values)^2)  # Residual sum of squares
+tss <- sum((y - mean(y))^2)  # Total sum of squares
+r_squared <- 1 - (rss / tss)  # R-squared
+
+# Print the R-squared value
+cat("R-squared:", r_squared, "\n")
+
 ```
 
 
 
-Lasso for REMOVE model
+
+Try lasso regression for FILL REMOVAL
 ```{r}
 
+#make testing and training dataset
+set.seed(61)
+split_per <- .7 #Setting Trainging Size
+
+n <- sample(x = nrow(all_eps_filled), size = ceiling(split_per*nrow(all_eps_filled))) #Getting Training observation indexes
+
+train <- all_eps_filled[n,] #Creating Training data
+test <- all_eps_filled[-n,] #Creating Testing data
+
+
+#make dummy variables for month and weekday (not for system bc it will not be fed into the model)
+month_dummy <- model.matrix(~ month - 1, data = train)
+day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = train)
+
+#attach dummies to train
+x <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
+y <- train$log_reduction #outcome variable
+cv_model <- cv.glmnet(x, y, alpha = 1, family = "gaussian")
+plot(cv_model)
+
+
+
+#Extract Optimal Lambda
+opt_lambda <- cv_model$lambda.1se
+lasso_model <- glmnet(x, y, alpha = 1, family = "gaussian", lambda = opt_lambda)
+plot(lasso_model)
+coef(lasso_model)
+
+#Predict on the test set
+
+#levels_all <- levels(train$month)  # Get all levels of `month` variable from the training data
+#month_dummy <- model.matrix(~ month - 1, data = test, levels = levels_all)
+#day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = test)
+
+x_test <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
+y_pred <- predict(lasso_model, newx = x_test)
+
+
+# Example: Calculate mean squared error
+mse <- mean((train$log_reduction - y_pred)^2)
+
+
+#visualize
+time <- train$timestamp
+floc <- train$Floc_percent
+# Predict the response variable using the Lasso model
+predicted_values <- predict(lasso_model, newx = x)
+
+
+# Plot the observed values over time
+plot(time, y, pch = 16, col = "#42CEB3", xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
+
+# Add the Lasso predictions over time
+points(time, predicted_values, pch = 16, col = "#710C66")
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Reductions over Time")
+
+# Add legend
+legend("bottomleft", legend = c("Observed", "Predicted"), pch = 16, col = c("#42CEB3", "#710C66"))
+
+
+
+
+# Create color vectors based on "system" variable
+obs_color <- ifelse(system == 2, "#42CEB3", "#D95E4F")
+pred_color <- ifelse(system == 2, "#E4A458", "#710C66")
+
+# Plot the observed values over time with color differentiation based on "system"
+plot(time, y, pch = 16, col = obs_color, xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
+
+# Add the Lasso predictions over time with color differentiation based on "system"
+points(time, predicted_values, pch = 16, col = pred_color)
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Reductions over Time")
+
+# Move the legend to the outside
+legend("bottomleft", legend = c("Observed Pilot", "Observed Control", "Predicted Pilot", "Predicted Control"),
+       pch = 16, col = c("#42CEB3", "#D95E4F", "#E4A458", "#710C66"), bty = "n")
+
+
+```
+
+
+Try lasso regression for REMOVE levels
+```{r}
+
+#make testing and training dataset
+set.seed(61)
+split_per <- .8 #Setting Trainging Size
+
+n <- sample(x = nrow(all_eps_removed), size = ceiling(split_per*nrow(all_eps_removed))) #Getting Training observation indexes
+
+train <- all_eps_removed[n,] #Creating Training data
+test <- all_eps_removed[-n,] #Creating Testing data
+
+#make dummy variables for month and weekday (not for system bc it will not be fed into the model)
+month_dummy <- model.matrix(~ month - 1, data = train)
+day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = train)
+
+#attach dummies to train
+x <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
+y <- train$log_ecoli #outcome variable
+cv_model <- cv.glmnet(x, y, alpha = 1, family = "gaussian")
+plot(cv_model)
+
+
+
+#Extract Optimal Lambda
+opt_lambda <- cv_model$lambda.1se
+lasso_model <- glmnet(x, y, alpha = 1, family = "gaussian", lambda = opt_lambda)
+plot(lasso_model)
+coef(lasso_model)
+
+#Predict on the test set
+
+#levels_all <- levels(train$month)  # Get all levels of `month` variable from the training data
+#month_dummy <- model.matrix(~ month - 1, data = test, levels = levels_all)
+#day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = test)
+
+x_test <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
+y_pred <- predict(lasso_model, newx = x_test)
+
+
+# Example: Calculate mean squared error
+mse <- mean((test$log_ecoli - y_pred)^2)
+
+
+#visualize
+time <- train$timestamp
+floc <- train$Floc_percent
+# Predict the response variable using the Lasso model
+predicted_values <- predict(lasso_model, newx = x)
+
+
+# Plot the observed values over time
+plot(time, y, pch = 16, col = "#42CEB3", xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
+
+# Add the Lasso predictions over time
+points(time, predicted_values, pch = 16, col = "#710C66")
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Concentration over Time")
+
+# Add legend
+legend("bottomleft", legend = c("Observed", "Predicted"), pch = 16, col = c("#42CEB3", "#710C66"))
+
+
+
+
+# Create color vectors based on "system" variable
+obs_color <- ifelse(system == 2, "#42CEB3", "#D95E4F")
+pred_color <- ifelse(system == 2, "#E4A458", "#710C66")
+
+# Plot the observed values over time with color differentiation based on "system"
+plot(time, y, pch = 16, col = obs_color, xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
+
+# Add the Lasso predictions over time with color differentiation based on "system"
+points(time, predicted_values, pch = 16, col = pred_color)
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Concentration over Time")
+
+# Move the legend to the outside
+legend("bottomleft", legend = c("Observed Pilot", "Observed Control", "Predicted Pilot", "Predicted Control"),
+       pch = 16, col = c("#42CEB3", "#D95E4F", "#E4A458", "#710C66"), bty = "n")
+
+
+
+
+
+# Predict the response variable using the Lasso model
+predicted_values <- predict(lasso_model, newx = x)
+
+# Calculate R-squared
+rss <- sum((y - predicted_values)^2)  # Residual sum of squares
+tss <- sum((y - mean(y))^2)  # Total sum of squares
+r_squared <- 1 - (rss / tss)  # R-squared
+
+# Print the R-squared value
+cat("R-squared:", r_squared, "\n")
+
 ```
 
 
 
+
+Try lasso regression for REMOVE REMOVAL
+```{r}
+
+#make testing and training dataset
+set.seed(61)
+split_per <- .7 #Setting Trainging Size
+
+n <- sample(x = nrow(all_eps_removed), size = ceiling(split_per*nrow(all_eps_removed))) #Getting Training observation indexes
+
+train <- all_eps_removed[n,] #Creating Training data
+test <- all_eps_removed[-n,] #Creating Testing data
+
+
+#make dummy variables for month and weekday (not for system bc it will not be fed into the model)
+month_dummy <- model.matrix(~ month - 1, data = train)
+day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = train)
+
+#attach dummies to train
+x <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
+y <- train$log_reduction #outcome variable
+cv_model <- cv.glmnet(x, y, alpha = 1, family = "gaussian")
+plot(cv_model)
+
+
+
+#Extract Optimal Lambda
+opt_lambda <- cv_model$lambda.1se
+lasso_model <- glmnet(x, y, alpha = 1, family = "gaussian", lambda = opt_lambda)
+plot(lasso_model)
+coef(lasso_model)
+
+#Predict on the test set
+
+#levels_all <- levels(train$month)  # Get all levels of `month` variable from the training data
+#month_dummy <- model.matrix(~ month - 1, data = test, levels = levels_all)
+#day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = test)
+
+x_test <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
+y_pred <- predict(lasso_model, newx = x_test)
+
+
+# Example: Calculate mean squared error
+mse <- mean((train$log_reduction - y_pred)^2)
+
+
+#visualize
+time <- train$timestamp
+floc <- train$Floc_percent
+# Predict the response variable using the Lasso model
+predicted_values <- predict(lasso_model, newx = x)
+
+
+# Plot the observed values over time
+plot(time, y, pch = 16, col = "#42CEB3", xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
+
+# Add the Lasso predictions over time
+points(time, predicted_values, pch = 16, col = "#710C66")
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Reductions over Time")
+
+# Add legend
+legend("bottomleft", legend = c("Observed", "Predicted"), pch = 16, col = c("#42CEB3", "#710C66"))
+
+
+
+
+# Create color vectors based on "system" variable
+obs_color <- ifelse(system == 2, "#42CEB3", "#D95E4F")
+pred_color <- ifelse(system == 2, "#E4A458", "#710C66")
+
+# Plot the observed values over time with color differentiation based on "system"
+plot(time, y, pch = 16, col = obs_color, xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
+
+# Add the Lasso predictions over time with color differentiation based on "system"
+points(time, predicted_values, pch = 16, col = pred_color)
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Reductions over Time")
+
+# Move the legend to the outside
+legend("bottomleft", legend = c("Observed Pilot", "Observed Control", "Predicted Pilot", "Predicted Control"),
+       pch = 16, col = c("#42CEB3", "#D95E4F", "#E4A458", "#710C66"), bty = "n")
+
+
+```
 
 
 
@@ -126,7 +459,7 @@ train <- all_eps_filled[n,] #Creating Training data
 test <- all_eps_filled[-n,] #Creating Testing data
 
 #fitting full model
-mod_full <- lm(data = train[,-1], log_ecoli~.)
+mod_full <- lm(data = train[,-1], log_reduction~.)
 
 #using ols_step_all to get all predictor variables possibilities
 subset <- ols_step_best_subset(mod_full) |> as_tibble()
