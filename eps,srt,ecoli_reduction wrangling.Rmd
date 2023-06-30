@@ -51,14 +51,14 @@ ecoli$'NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)'[ecoli$'NAB4 and 9
 ecoli <- ecoli %>% select(-'NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)', -'NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)')
 
 ## make LOG reduction variable
-ecoli$log_pilot_reduction <- log(ecoli$`NSI E. coli (LAB) (EC/100mL)`)- log(ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`)
+ecoli$log_pilot_reduction <- log(ecoli$`NSI E. coli (LAB) (EC/100mL)`, base = 10)- log(ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
 
-ecoli$log_control_reduction <- log(ecoli$`NSI E. coli (LAB) (EC/100mL)`)-log(ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`)
+ecoli$log_control_reduction <- log(ecoli$`NSI E. coli (LAB) (EC/100mL)`, base = 10)-log(ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
 
 
 ## normal effluent variables just need to be log transformed
-ecoli$log_pilot_ecoli <- log(ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`)
-ecoli$log_control_ecoli <- log(ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`)
+ecoli$log_pilot_ecoli <- log(ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+ecoli$log_control_ecoli <- log(ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
 
 
 #only select useful variables

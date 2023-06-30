@@ -58,25 +58,30 @@ heatmap(cor_matrix,
 
 
 
+
+
+
+
 Try lasso regression for FILL levels
 ```{r}
 
 #make testing and training dataset
 set.seed(61)
 split_per <- .8 #Setting Trainging Size
-
 n <- sample(x = nrow(all_eps_filled), size = ceiling(split_per*nrow(all_eps_filled))) #Getting Training observation indexes
-
 train <- all_eps_filled[n,] #Creating Training data
 test <- all_eps_filled[-n,] #Creating Testing data
 
-#make dummy variables for month and weekday (not for system bc it will not be fed into the model)
-month_dummy <- model.matrix(~ month - 1, data = train)
-day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = train)
 
-#attach dummies to train
-x <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
-y <- train$log_ecoli # outcome variable
+
+#make dummy variables for month and weekday (not for system bc it will not be fed into the model)
+#month_dummy <- model.matrix(~ month - 1, data = all_eps_filled)
+#day_of_week_dummy <- model.matrix(~ day_of_week - 1, data = all_eps_filled)
+
+
+#extablish variables and make model
+x <- cbind(as.matrix(all_eps_filled[, -c(1:3, 77:79)]))
+y <- all_eps_filled$log_ecoli # outcome variable
 cv_model <- cv.glmnet(x, y, alpha = 1, family = "gaussian")
 
 
@@ -84,13 +89,12 @@ cv_model <- cv.glmnet(x, y, alpha = 1, family = "gaussian")
 plot(cv_model)
 
 
-
-
 #Extract Optimal Lambda
 opt_lambda <- cv_model$lambda.1se
 lasso_model <- glmnet(x, y, alpha = 1, family = "gaussian", lambda = opt_lambda)
 plot(lasso_model)
 coef(lasso_model)
+
 
 #Predict on the test set
 
@@ -102,16 +106,13 @@ x_test <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
 y_pred <- predict(lasso_model, newx = x_test)
 
 
-# Example: Calculate mean squared error
-mse <- mean((test$log_ecoli - y_pred)^2)
 
 
 #visualize
-time <- train$timestamp
-floc <- train$Floc_percent
+
 # Predict the response variable using the Lasso model
 predicted_values <- predict(lasso_model, newx = x)
-
+time <- all_eps_filled$timestamp
 
 # Plot the observed values over time
 plot(time, y, pch = 16, col = "#42CEB3", xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)")
@@ -146,21 +147,76 @@ legend("bottomleft", legend = c("Observed Pilot", "Observed Control", "Predicted
        pch = 16, col = c("#42CEB3", "#D95E4F", "#E4A458", "#710C66"), bty = "n")
 
 
+```
 
+
+
+
+Evaluate Lasso for FILL
+```{r}
+lasso_model <- glmnet(x, y, alpha = 0, family = "gaussian", lambda = opt_lambda)
+
+x_test <- cbind(as.matrix(train[, -c(1:3, 77:79)]))
+y_pred <- predict(lasso_model, newx = x_test)
 
 
 # Predict the response variable using the Lasso model
 predicted_values <- predict(lasso_model, newx = x)
 
-# Calculate R-squared
-rss <- sum((y - predicted_values)^2)  # Residual sum of squares
-tss <- sum((y - mean(y))^2)  # Total sum of squares
-r_squared <- 1 - (rss / tss)  # R-squared
+# Calculate residuals
+residuals <- y - predicted_values
 
-# Print the R-squared value
-cat("R-squared:", r_squared, "\n")
+# Scatter plot of residuals over time
+plot(all_eps_filled$timestamp, residuals, type = "p", xlab = "Time", ylab = "Residuals")
+
+# Sort data by timestamp
+sorted_data <- train[order(train$timestamp), ]
+sorted_timestamp <- sorted_data$timestamp
+sorted_residuals <- residuals[order(train$timestamp)]
+
+# Line plot of residuals over time
+plot(sorted_timestamp, sorted_residuals, type = "l", xlab = "Time", ylab = "Residuals")
+
+
+# Scatter plot of residuals over predicted values
+plot(predicted_values, residuals, xlab = "Predicted E. Coli Values", ylab = "Residuals")
+
+# Create a histogram of residuals
+hist(residuals, breaks = "FD", col = "lightblue", xlab = "Residuals", ylab = "Frequency", main = "Histogram of Residuals")
+
+# Create a density plot of residuals
+plot(density(residuals), main = "Density Plot of Residuals", xlab = "Residuals", ylab = "Density")
+
+# Calculate RMSE
+rmse <- sqrt(mean(residuals^2))
+
+# Calculate MSE
+mse <- mean(residuals^2)
+
+# Calculate R-squared
+y_mean <- mean(y)  # Mean of the actual target variable
+ss_residual <- sum(residuals^2)  # Sum of squared residuals
+ss_total <- sum((y - y_mean)^2)  # Total sum of squares
+rsquared <- 1 - (ss_residual / ss_total)
+
+# Print the RMSE, MSE, and R-squared
+cat("RMSE:", rmse, "\n")
+cat("MSE:", mse, "\n")
+cat("R-squared:", rsquared, "\n")
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -251,6 +307,45 @@ legend("bottomleft", legend = c("Observed Pilot", "Observed Control", "Predicted
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 Try lasso regression for REMOVE levels
