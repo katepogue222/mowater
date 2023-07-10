@@ -26,6 +26,21 @@ ASRT_main <- read_excel("data/ASRT_main.xlsx")
 ASRT_other <- read_excel("data/ASRT_other.xlsx")
 ```
 
+
+
+Scratchpad
+```{r}
+compare <- NAB2 %>% select( "NNE E.coli (LAB) EC/100mL", 
+                 "NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)",
+                 "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)",
+                 "NSI E. coli (LAB) (EC/100mL)",
+                 "NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)",
+                 )
+```
+
+
+
+
 make e. coli reduction variable and wrangle ASRT
 ```{r}
 # Convert "timestamp" column to a date vector
@@ -34,7 +49,7 @@ ASRT_other$timestamp <- as.Date(ASRT_other$timestamp, format = "%Y/%m/%d")
 
 
 #select relevant variables
-ecoli <- NAB2 %>% select(timestamp, 
+ecoli <- NAB2 %>% select(timestamp, "NNE E.coli (LAB) EC/100mL",
                          "NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)", 
                          "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)", 
                          "NSI E. coli (LAB) (EC/100mL)", 
@@ -58,7 +73,7 @@ ecoli$log_control_reduction <- log(ecoli$`NSI E. coli (LAB) (EC/100mL)`, base = 
 
 ## normal effluent variables just need to be log transformed
 ecoli$log_pilot_ecoli <- log(ecoli$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
-ecoli$log_control_ecoli <- log(ecoli$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+ecoli$log_control_ecoli <- log(ecoli$`NNE E.coli (LAB) EC/100mL`, base = 10)
 
 
 #only select useful variables
@@ -67,7 +82,7 @@ ecoli <- ecoli %>% select(timestamp,
                           log_control_reduction, 
                           log_pilot_ecoli, 
                           log_control_ecoli)
-ecoli <- na.omit(ecoli)
+
 
 #look at distributions
 ggplot() +
@@ -688,6 +703,8 @@ all_eps_filled <- all_eps_filled %>%
     month = month(timestamp),
     month = factor(month)
   )
+
+all_eps_filled <- na.omit(all_eps_filled)
 
 ```
 

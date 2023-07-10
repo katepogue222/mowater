@@ -1,0 +1,119 @@
+---
+title: "Translated Test/Train Data Splitter"
+author: "Kate Pogue"
+date: "2023-07-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(caret)
+
+### Split data
+
+train_test_time_split <- function(df, y_col, x_drop = c(), train_frac = 0.7, scale = "") {
+  
+  if (length(x_drop) > 0) {
+    df <- df %>% select(-one_of(x_drop))
+  }
+  
+  # Training observations
+  n <- round(nrow(df) * train_frac)
+  df_test <- df[(n+1):nrow(df), ]
+  df_train <- df[1:n, ]
+  
+  # Train test split
+  y_test <- df_test[[y_col]]
+  x_test <- df_test %>% select(-one_of(y_col))
+  y_train <- df_train[[y_col]]
+  x_train <- df_train %>% select(-one_of(y_col))
+  
+  # Scaling
+  if (length(scale) > 0) {
+    x_feat <- colnames(x_train)
+    train_index <- rownames(x_train)
+    test_index <- rownames(x_test)
+    
+    if (scale == "MinMax") {
+      scaler <- preProcess(x_train, method = "range")
+    } else {
+      scaler <- preProcess(x_train, method = "center", center = TRUE, scale = TRUE)
+    }
+    
+    x_train <- predict(scaler, x_train)
+    x_train <- as.data.frame(x_train, col.names = x_feat, row.names = train_index)
+    
+    x_test <- predict(scaler, x_test)
+    x_test <- as.data.frame(x_test, col.names = x_feat, row.names = test_index)
+  }
+  
+  return(list(df = df, x_train = x_train, x_test = x_test, y_train = y_train, y_test = y_test))
+}
+
+
+### Split data
+
+train_test_rolling_split <- function(df, y_col, x_drop = c(), train_frac = 0.7, scale = "") {
+  
+  if (length(x_drop) > 0) {
+    df <- df %>% select(-one_of(x_drop))
+  }
+  
+  # Testing observations
+  window_size <- round(nrow(df) * (1 - train_frac))
+  splits <- list()
+  
+  for (i in (window_size + 1):nrow(df)) {
+    test <- ((i - window_size):i)
+    train <- setdiff(1:nrow(df), test)
+    splits[[i - window_size]] <- list(TRAIN = train, TEST = test)
+  }
+  
+  df_test <- df[(n+1):nrow(df), ]
+  df_train <- df[1:n, ]
+  
+  # Train test split
+  y_test <- df_test[[y_col]]
+  x_test <- df_test %>% select(-one_of(y_col))
+  y_train <- df_train[[y_col]]
+  x_train <- df_train %>% select(-one_of(y_col))
+  
+  # Scaling
+  if (length(scale) > 0) {
+    x_feat <- colnames(x_train)
+    train_index <- rownames(x_train)
+    test_index <- rownames(x_test)
+    
+    if (scale == "MinMax") {
+      scaler <- preProcess(x_train, method = "range")
+    } else {
+      scaler <- preProcess(x_train, method = "center", center = TRUE, scale = TRUE)
+    }
+    
+    x_train <- predict(scaler, x_train)
+    x_train <- as.data.frame(x_train, col.names = x_feat, row.names = train_index)
+    
+    x_test <- predict(scaler, x_test)
+    x_test <- as.data.frame(x_test, col.names = x_feat, row.names = test_index)
+  }
+  
+  return(list(df = df, x_train = x_train, x_test = x_test, y_train = y_train, y_test = y_test))
+}
+
+
+data <- 0:35
+window_size <- 12
+splits <- list()
+
+for (i in (window_size + 1):length(data)) {
+  train <- data[(i - window_size):i - 1]
+  test <- data[i:(i + 2)]
+  splits[[i - window_size]] <- list(TRAIN = train, TEST = test)
+}
+
+```
+
