@@ -56,26 +56,16 @@ heatmap(cor_matrix,
 ```
 
 
-NEW test/train split for levels
-```{r}
-result <- train_test_rolling_split(all_eps_filled, y_col = "log_ecoli", x_drop = c("timestamp", "log_reduction", "system", "day_of_week", "month"), train_frac = 0.7, scale = "StandardScaler")
-
-train <- result$train
-test <- result$test
-```
-
-
-
 
 Try lasso regression for FILL levels
 ```{r}
 
 #make testing and training dataset
-#set.seed(61)
-#split_per <- .8 #Setting Trainging Size
-#n <- sample(x = nrow(all_eps_filled), size = ceiling(split_per*nrow(all_eps_filled))) #Getting Training observation indexes
-#train <- all_eps_filled[n,] #Creating Training data
-#test <- all_eps_filled[-n,] #Creating Testing data
+set.seed(61)
+split_per <- .8 #Setting Trainging Size
+n <- sample(x = nrow(all_eps_filled), size = ceiling(split_per*nrow(all_eps_filled))) #Getting Training observation indexes
+train <- all_eps_filled[n,] #Creating Training data
+test <- all_eps_filled[-n,] #Creating Testing data
 
 
 

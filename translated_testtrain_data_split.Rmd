@@ -68,18 +68,10 @@ train_test_rolling_split <- function(df, y_col, x_drop = c(), train_frac = 0.7, 
     df <- df %>% select(-one_of(x_drop))
   }
   
-  # Testing observations
-  window_size <- round(nrow(df) * (1 - train_frac))
-  splits <- list()
-  
-  for (i in (window_size + 1):nrow(df)) {
-    test <- ((i - window_size):i)
-    train <- setdiff(1:nrow(df), test)
-    splits[[i - window_size]] <- list(TRAIN = train, TEST = test)
-  }
-  
-  df_test <- df[(window_size + 1):nrow(df), ]
-  df_train <- df[1:window_size, ]
+  # Training observations
+  n <- round(nrow(df) * train_frac)
+  df_test <- df[(n+1):nrow(df), ]
+  df_train <- df[1:n, ]
   
   # Train test split
   y_test <- df_test[[y_col]]
@@ -106,10 +98,7 @@ train_test_rolling_split <- function(df, y_col, x_drop = c(), train_frac = 0.7, 
     x_test <- as.data.frame(x_test, col.names = x_feat, row.names = test_index)
   }
   
-  test <- cbind(y_test, x_test)
-  train <- cbind(y_train, x_train)
-  
-  return(list(df = df, train = train, test = test))
+  return(list(df = df, x_train = x_train, x_test = x_test, y_train = y_train, y_test = y_test))
 }
 
 
