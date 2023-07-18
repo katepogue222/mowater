@@ -13,6 +13,8 @@ Loading Packages
 ```{r}
 library(glmnet)
 library(tidyverse)
+library(randomForest)
+
 ```
 
 
@@ -504,3 +506,33 @@ ggplot(data, aes(x = timestamp, y = observed)) +
   scale_color_manual(values = c("blue", "red"), labels = c("Observed", "Predicted"))
 
 ```
+
+
+Try Random Forest
+```{r}
+# Specify the column index of the target variable in your dataset
+target_col <- 2  # Change it to the appropriate column index
+
+# Build the random forest model
+rf_model <- randomForest(data = train[, -c(1:3, 77:79)],
+                         y = train[, 2],
+                         ntree = 100,  # Number of trees in the forest
+                         mtry = floor(sqrt(73)),  # Number of variables to consider at each split
+                         importance = TRUE)  # Calculate variable importance measures
+
+# Print the summary of the model
+print(rf_model)
+
+# Predict using the random forest model
+predictions <- predict(rf_model, newdata = test_data[, -target_col])
+
+# Evaluate the model performance
+accuracy <- sum(predictions == test_data[, target_col]) / length(predictions)
+print(paste("Accuracy:", round(accuracy, 4)))
+
+# Variable importance plot
+var_importance <- importance(rf_model)
+varImpPlot(rf_model)
+
+```
+
