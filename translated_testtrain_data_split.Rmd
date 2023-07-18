@@ -104,3 +104,16 @@ train_test_rolling_split <- function(df, y_col, x_drop = c(), train_frac = 0.7, 
 
 ```
 
+Test
+```{r}
+geep <- train_test_rolling_split(all_eps_filled, y_col= "log_ecoli", x_drop = c("timestamp","log_reduction", "system", "day_of_week", "month" ), train_frac = 0.7)
+
+train <- geep$y_train
+test <- geep$y_test
+
+
+summary(train)
+summary(test)
+```
+
+

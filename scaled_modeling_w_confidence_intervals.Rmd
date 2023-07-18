@@ -1,0 +1,506 @@
+---
+title: "E. coli Modeling with Scaled Splits"
+author: "Kate Pogue"
+date: "2023-07-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Packages
+```{r}
+library(glmnet)
+library(tidyverse)
+```
+
+
+Loading Data
+```{r}
+all_eps_filled <- read_csv("data/all_eps_filled.csv")
+all_eps_removed <- read_csv("data/all_eps_removed.csv")
+```
+
+
+Loading Split Function
+```{r}
+split_data_similar_y_range <- function(df, y_col, train_frac = 0.7, seed = 122) {
+  # Set seed for reproducibility
+  set.seed(seed)
+  
+  # Sort dataframe by y_col in ascending order
+  sorted_df <- df[order(df[[y_col]]), ]
+  
+  # Determine the indices to split the data based on the range of y values
+  n <- nrow(sorted_df)
+  train_index <- 1:round(train_frac * n)
+  
+  # Identify the minimum and maximum y values
+  y_min <- min(sorted_df[[y_col]])
+  y_max <- max(sorted_df[[y_col]])
+  
+  # Create a stratification variable based on y values
+  sorted_df$y_strata <- cut(sorted_df[[y_col]], breaks = quantile(sorted_df[[y_col]], probs = seq(0, 1, 0.2)), include.lowest = TRUE, labels = FALSE)
+  
+  # Determine the indices for testing data within the same y strata as training data
+  test_index <- which(sorted_df[[y_col]] >= y_min & sorted_df[[y_col]] <= y_max & sorted_df$y_strata %in% unique(sorted_df[train_index, ]$y_strata))
+  test_index <- sample(test_index, round((1 - train_frac) * n))
+  
+  # Split the data into training and testing datasets
+  train_data <- sorted_df[train_index, ]
+  test_data <- sorted_df[test_index, ]
+  
+  return(list(train_data = train_data, test_data = test_data))
+}
+
+```
+
+
+Split FILL LEVELS
+```{r}
+# Split the data with the same range of y values
+split_result <- split_data_similar_y_range(all_eps_filled, y_col = "log_ecoli", train_frac = 0.7)
+
+# Access the training and testing data
+train <- split_result$train_data[,-80]
+test <- split_result$test_data[,-80]
+```
+
+
+Check range
+```{r}
+# Create a combined dataset for plotting
+combined_data <- rbind(data.frame(Data = "Train", Value = train$log_ecoli),
+                       data.frame(Data = "Test", Value = test$log_ecoli))
+
+# Create the boxplot
+ggplot(combined_data, aes(x = Data, y = Value)) +
+  geom_boxplot() +
+  xlab("Data") +
+  ylab("Log Transformed E. coli Reduction (EC/100mL)") +
+  ggtitle("Distribution of Log E. coli Reduction in Training and Testing Data")
+```
+
+
+
+Fit FILL LEVELS
+```{r}
+#extablish variables and make model
+x <- as.matrix(train[, -c(1:3, 77:79)])
+y <- train$log_ecoli
+cv_model <- cv.glmnet(x, y, alpha = 1, family = "gaussian")
+
+# Plot with title
+plot(cv_model)
+
+
+#Extract Optimal Lambda
+opt_lambda <- cv_model$lambda.1se
+lasso_model <- glmnet(x, y, alpha = 1, family = "gaussian", lambda = opt_lambda)
+plot(lasso_model)
+coef(lasso_model)
+
+
+#Predict on the test set
+
+x_test <- as.matrix(test[, -c(1:3, 77:79)])
+y_test <- test$log_ecoli
+y_pred <- predict(lasso_model, newx = x_test)
+time <- test$timestamp
+
+# Plot the observed values over time with extended y-axis
+plot(time, y_test, pch = 16, col = "#42CEB3", xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)",
+     ylim = c(min(y_test, y_pred), max(y_test, y_pred)))
+
+# Add the Lasso predictions over time
+points(time, y_pred, pch = 16, col = "#710C66")
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Concentration over Time")
+
+# Add legend
+legend("bottomleft", legend = c("Observed", "Predicted"), pch = 16, col = c("#42CEB3", "#710C66"))
+
+
+
+# Create a scatter plot of y_test vs y_pred
+plot(y_test, y_pred, pch = 16, col = "blue",
+     xlab = "Observed Values", ylab = "Predicted Values",
+     main = "Observed vs Predicted")
+
+# Add a diagonal reference line
+abline(a = 0, b = 1, col = "red", lty = "dashed")
+
+
+
+```
+
+
+
+
+Evaluate Lasso for FILL
+```{r}
+x <- as.matrix(test[, -c(1:3, 77:79)])
+y <- test$log_ecoli
+
+
+x_test <- as.matrix(test[, -c(1:3, 77:79)])
+y_test <- test$log_ecoli
+y_pred <- predict(lasso_model, newx = x_test)
+time <- test$timestamp
+
+
+# Calculate residuals
+residuals <- y - y_pred
+
+# Scatter plot of residuals over time
+plot(time, residuals, type = "p", xlab = "Time", ylab = "Residuals")
+
+
+# Scatter plot of residuals over predicted values
+plot(y_pred, residuals, xlab = "Predicted E. Coli Values", ylab = "Residuals")
+
+# Create a histogram of residuals
+hist(residuals, breaks = "FD", col = "lightblue", xlab = "Residuals", ylab = "Frequency", main = "Histogram of Residuals")
+
+# Create a density plot of residuals
+plot(density(residuals), main = "Density Plot of Residuals", xlab = "Residuals", ylab = "Density")
+
+# Calculate RMSE
+rmse <- sqrt(mean(residuals^2))
+
+# Calculate MSE
+mse <- mean(residuals^2)
+
+# Calculate R-squared
+y_mean <- mean(y)  # Mean of the actual target variable
+ss_residual <- sum(residuals^2)  # Sum of squared residuals
+ss_total <- sum((y - y_mean)^2)  # Total sum of squares
+rsquared <- 1 - (ss_residual / ss_total)
+
+# Print the RMSE, MSE, and R-squared
+cat("RMSE:", rmse, "\n")
+cat("MSE:", mse, "\n")
+cat("R-squared:", rsquared, "\n")
+
+```
+
+there might be an non-linear relationship or other factor. explore random forest?
+
+Confidence Intervals for FILL LEVELS
+```{r}
+# Initialize variables
+all <- all_eps_filled[, -c(1:2, 77:79)]
+
+train<- train[, -c(1:2, 77:79)]
+x <- as.matrix(train)
+
+# Extract the selected predictors and intercept from the Lasso model
+lasso_selected <- coef(lasso_model)
+
+# Indices of the selected predictors (excluding the intercept)
+selected_indices <- which(lasso_selected != 0)[-1]
+
+# Create a subset of x with the selected predictors and intercept
+x_selected <- as.data.frame(x[, c(1, selected_indices)])
+
+# Initialize variables
+n.bootstrap <- 100   # Number of bootstrap samples
+n.coefficients <- length(selected_indices) + 1  # Number of coefficients (including the intercept)
+
+# Create a matrix to store bootstrap coefficient estimates
+bootstrap.coefficients <- matrix(NA, nrow = n.coefficients, ncol = n.bootstrap)
+
+# Bootstrap and fit linear models
+for (i in 1:n.bootstrap) {
+  # Generate a bootstrap sample by resampling with replacement
+  bootstrap.sample <- sample(nrow(train), replace = TRUE)
+  
+  # Fit a linear model on the bootstrap sample
+  bootstrap.model <- lm(log_ecoli ~ ., data = x_selected[bootstrap.sample, ])
+  
+  # Store the coefficient estimates for selected predictors and intercept
+  bootstrap.coefficients[, i] <- coef(bootstrap.model)
+}
+
+bootstrap.coefficients <- na.omit(bootstrap.coefficients)
+
+# Calculate confidence intervals
+lower.quantile <- apply(bootstrap.coefficients, 1, quantile, probs = 0.05)
+upper.quantile <- apply(bootstrap.coefficients, 1, quantile, probs = 0.95)
+
+# Create a dataframe to store the confidence intervals
+interval <- data.frame(predictor = c("(Intercept)", colnames(x_selected)[-c(1,12)]),
+                       lower = c(lower.quantile[1], lower.quantile[-1]),
+                       upper = c(upper.quantile[1], upper.quantile[-1]))
+
+
+```
+
+
+Graph a linear Model
+```{r}
+
+# Fit a linear model
+linear.model <- lm(log_ecoli ~ ABXC_AIRFLOW +
+                   `NSEC MIN ASRT (days)` +
+                   `NSI Total COD (LAB) (mg/L)` +
+                   `NSI E. coli (LAB) (EC/100mL)` +
+                   `NSI NO2 (LAB) (mg/L)` +
+                   `NSI sCOD (mg/L)`, data = all_eps_filled)
+
+# Extract the observed and predicted values
+observed <- all_eps_filled$log_ecoli
+predicted <- predict(linear.model)
+
+# Create a scatter plot of observed vs predicted values
+plot(observed, predicted, xlab = "Observed Values", ylab = "Predicted Values", main = "Observed vs Predicted Values")
+abline(0, 1, col = "red")  # Add a reference line with slope 1 and intercept 0
+
+
+# Create a data frame with timestamp, observed, and predicted values
+data <- data.frame(timestamp = all_eps_filled$timestamp, observed = observed, predicted = predicted)
+
+# Create a scatter plot with timestamp on the x-axis
+ggplot(data, aes(x = timestamp, y = observed)) +
+  geom_point(color = "blue") +
+  geom_point(aes(y = predicted), color = "red") +
+  labs(x = "Time", y = "Observed and Predicted Values", title = "Observed and Predicted Values Over Time") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  scale_color_manual(values = c("blue", "red"), labels = c("Observed", "Predicted"))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Split FILL REDUCTION
+```{r}
+# Split the data with the same range of y values
+split_result <- split_data_similar_y_range(all_eps_filled, y_col = "log_reduction", train_frac = 0.7, seed = 3)
+
+# Access the training and testing data
+train <- split_result$train_data[,-80]
+test <- split_result$test_data[,-80]
+```
+
+Check range
+```{r}
+# Create a combined dataset for plotting
+combined_data <- rbind(data.frame(Data = "train", Value = train$log_reduction),
+                       data.frame(Data = "test", Value = test$log_reduction))
+
+# Create the boxplot
+ggplot(combined_data, aes(x = Data, y = Value)) +
+  geom_boxplot() +
+  xlab("Data") +
+  ylab("Log Transformed E. coli Reduction (EC/100mL)") +
+  ggtitle("Distribution of Log E. coli Reduction in Training and Testing Data")
+```
+
+
+
+
+Fit Fill Reduction
+```{r}
+#extablish variables and make model
+x <- as.matrix(train[, -c(1:3, 77:79)])
+y <- train$log_reduction
+cv_model <- cv.glmnet(x, y, alpha = 1, family = "gaussian")
+
+# Plot with title
+plot(cv_model)
+
+
+#Extract Optimal Lambda
+opt_lambda <- cv_model$lambda.1se
+lasso_model <- glmnet(x, y, alpha = 1, family = "gaussian", lambda = .08)
+plot(lasso_model)
+coef(lasso_model)
+
+
+#Predict on the test set
+
+x_test <- as.matrix(test[, -c(1:3, 77:79)])
+y_test <- test$log_reduction
+y_pred <- predict(lasso_model, newx = x_test)
+time <- test$timestamp
+
+# Plot the observed values over time with extended y-axis
+plot(time, y_test, pch = 16, col = "#42CEB3", xlab = "Time", ylab = "Log Transformed E. coli Reduction (EC/100mL)",
+     ylim = c(min(y_test, y_pred), max(y_test, y_pred)))
+
+# Add the Lasso predictions over time
+points(time, y_pred, pch = 16, col = "#710C66")
+
+# Add a title to the plot
+title("Observed and Predicted E. coli Concentration over Time")
+
+# Add legend
+legend("bottomleft", legend = c("Observed", "Predicted"), pch = 16, col = c("#42CEB3", "#710C66"))
+
+
+
+# Create a scatter plot of y_test vs y_pred
+plot(y_test, y_pred, pch = 16, col = "blue",
+     xlab = "Observed Values", ylab = "Predicted Values",
+     main = "Observed vs Predicted")
+
+# Add a diagonal reference line
+abline(a = 0, b = 1, col = "red", lty = "dashed")
+
+
+
+```
+
+Validate Fill Reducation
+```{r}
+x <- as.matrix(test[, -c(1:3, 77:79)])
+y <- test$log_reduction
+
+
+x_test <- as.matrix(test[, -c(1:3, 77:79)])
+y_test <- test$log_reduction
+y_pred <- predict(lasso_model, newx = x_test)
+time <- test$timestamp
+
+
+# Calculate residuals
+residuals <- y - y_pred
+
+# Scatter plot of residuals over time
+plot(time, residuals, type = "p", xlab = "Time", ylab = "Residuals")
+
+
+# Scatter plot of residuals over predicted values
+plot(y_pred, residuals, xlab = "Predicted E. Coli Values", ylab = "Residuals")
+
+# Create a histogram of residuals
+hist(residuals, breaks = "FD", col = "lightblue", xlab = "Residuals", ylab = "Frequency", main = "Histogram of Residuals")
+
+# Create a density plot of residuals
+plot(density(residuals), main = "Density Plot of Residuals", xlab = "Residuals", ylab = "Density")
+
+# Calculate RMSE
+rmse <- sqrt(mean(residuals^2))
+
+# Calculate MSE
+mse <- mean(residuals^2)
+
+# Calculate R-squared
+y_mean <- mean(y)  # Mean of the actual target variable
+ss_residual <- sum(residuals^2)  # Sum of squared residuals
+ss_total <- sum((y - y_mean)^2)  # Total sum of squares
+rsquared <- 1 - (ss_residual / ss_total)
+
+# Print the RMSE, MSE, and R-squared
+cat("RMSE:", rmse, "\n")
+cat("MSE:", mse, "\n")
+cat("R-squared:", rsquared, "\n")
+
+```
+
+
+Confidence Intervals Fill Reduction
+```{r}
+# Initialize variables
+all <- all_eps_filled[, -c(1,3, 77:79)]
+
+train1<- train[, -c(1,3, 77:79)]
+x <- as.matrix(train1)
+
+# Extract the selected predictors and intercept from the Lasso model
+lasso_selected <- coef(lasso_model)
+
+# Indices of the selected predictors (excluding the intercept)
+selected_indices <- which(lasso_selected != 0)[-1]
+
+# Create a subset of x with the selected predictors and intercept
+x_selected <- as.data.frame(x[, c(1, selected_indices)])
+
+# Initialize variables
+n.bootstrap <- 100   # Number of bootstrap samples
+n.coefficients <- length(selected_indices) + 1  # Number of coefficients (including the intercept)
+
+# Create a matrix to store bootstrap coefficient estimates
+bootstrap.coefficients <- matrix(NA, nrow = n.coefficients, ncol = n.bootstrap)
+
+# Bootstrap and fit linear models
+for (i in 1:n.bootstrap) {
+  # Generate a bootstrap sample by resampling with replacement
+  bootstrap.sample <- sample(nrow(train1), replace = TRUE)
+  
+  # Fit a linear model on the bootstrap sample
+  bootstrap.model <- lm(log_reduction ~ ., data = x_selected[bootstrap.sample, ])
+  
+  # Store the coefficient estimates for selected predictors and intercept
+  bootstrap.coefficients[, i] <- coef(bootstrap.model)
+}
+
+bootstrap.coefficients <- na.omit(bootstrap.coefficients)
+
+# Calculate confidence intervals
+lower.quantile <- apply(bootstrap.coefficients, 1, quantile, probs = 0.025)
+upper.quantile <- apply(bootstrap.coefficients, 1, quantile, probs = 0.975)
+
+# Create a dataframe to store the confidence intervals
+interval <- data.frame(predictor = c("(Intercept)", colnames(x_selected)[-c(1,12)]),
+                       lower = c(lower.quantile[1], lower.quantile[-1]),
+                       upper = c(upper.quantile[1], upper.quantile[-1]))
+
+```
+
+
+
+Graph a linear Model
+```{r}
+# Fit a linear model
+linear.model <- lm(log_reduction ~ NABX_CLARIFIER_EFFLUENT_NH3 +
+                     `NSEC MIN ASRT (days)` +
+                     `NSI NH3 (mg N/L)` , data = all_eps_filled)
+
+# Extract the observed and predicted values
+observed <- all_eps_filled$log_reduction
+predicted <- predict(linear.model)
+
+# Create a scatter plot of observed vs predicted values
+plot(observed, predicted, xlab = "Observed Values", ylab = "Predicted Values", main = "Observed vs Predicted Values")
+abline(0, 1, col = "red")  # Add a reference line with slope 1 and intercept 0
+
+
+# Create a data frame with timestamp, observed, and predicted values
+data <- data.frame(timestamp = all_eps_filled$timestamp, observed = observed, predicted = predicted)
+
+# Create a scatter plot with timestamp on the x-axis
+ggplot(data, aes(x = timestamp, y = observed)) +
+  geom_point(color = "blue") +
+  geom_point(aes(y = predicted), color = "red") +
+  labs(x = "Time", y = "Observed and Predicted Values", title = "Observed and Predicted Values Over Time") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  scale_color_manual(values = c("blue", "red"), labels = c("Observed", "Predicted"))
+
+```

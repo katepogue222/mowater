@@ -1,0 +1,748 @@
+---
+title: "casdas_2.0"
+author: "Kate Pogue"
+date: "2023-07-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Packages
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+
+Loading Data
+```{r}
+NAB2 <- read_csv("data/NAB2_VER3.csv")
+EPS <- read_excel("data/all_EPS.xlsx")
+ASRT_main <- read_excel("data/ASRT_main.xlsx")
+ASRT_other <- read_excel("data/ASRT_other.xlsx")
+
+```
+
+
+Merge some 4 and 9 data
+```{r}
+#ecoli
+NAB2$`NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)`[is.na(NAB2$`NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)`)] <- 0
+NAB2$`NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)`[is.na(NAB2$`NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)`)] <- 0
+
+NAB2 <- mutate(NAB2, "NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)" = 
+              (NAB2$`NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)` + NAB2$'NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)'))
+
+NAB2$'NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)'[NAB2$'NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)', -'NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)')
+
+# c-pass tknh
+
+NAB2$`NAB4 C-Pass TKNH (LAB) (mg/L)`[is.na(NAB2$`NAB4 C-Pass TKNH (LAB) (mg/L)`)] <- 0
+NAB2$`NAB9 C-Pass TKNH (LAB) (mg/L)`[is.na(NAB2$`NAB9 C-Pass TKNH (LAB) (mg/L)`)] <- 0
+
+NAB2 <- mutate(NAB2, "NAB4 and 9 C-Pass TKNH (LAB) (mg/L)" = 
+              (NAB2$`NAB4 C-Pass TKNH (LAB) (mg/L)` + NAB2$`NAB9 C-Pass TKNH (LAB) (mg/L)`))
+
+NAB2$'NAB4 and 9 C-Pass TKNH (LAB) (mg/L)'[NAB2$'NAB4 and 9 C-Pass TKNH (LAB) (mg/L)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'NAB4 C-Pass TKNH (LAB) (mg/L)', -'NAB9 C-Pass TKNH (LAB) (mg/L)')
+
+# c-pass dsvi 30
+
+NAB2$`NAB4 C-Pass dSVI 30 (mL/g)`[is.na(NAB2$`NAB4 C-Pass dSVI 30 (mL/g)`)] <- 0
+NAB2$`NAB9 C-Pass dSVI 30 (mL/g)`[is.na(NAB2$`NAB9 C-Pass dSVI 30 (mL/g)`)] <- 0
+
+NAB2 <- mutate(NAB2, "NAB4 and 9 C-Pass dSVI 30 (mL/g)" = 
+              (NAB2$`NAB4 C-Pass dSVI 30 (mL/g)` + NAB2$`NAB9 C-Pass dSVI 30 (mL/g)`))
+
+NAB2$'NAB4 and 9 C-Pass dSVI 30 (mL/g)'[NAB2$'NAB4 and 9 C-Pass dSVI 30 (mL/g)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'NAB4 C-Pass dSVI 30 (mL/g)', -'NAB9 C-Pass dSVI 30 (mL/g)')
+
+#c-pass dsvi 5
+
+NAB2$`NAB4 C-Pass dSVI 5 (mL/g)`[is.na(NAB2$`NAB4 C-Pass dSVI 5 (mL/g)`)] <- 0
+NAB2$`NAB9 C-Pass dSVI 5 (mL/g)`[is.na(NAB2$`NAB9 C-Pass dSVI 5 (mL/g)`)] <- 0
+
+NAB2 <- mutate(NAB2, "NAB4 and 9 C-Pass dSVI 5 (mL/g)" = 
+              (NAB2$`NAB4 C-Pass dSVI 5 (mL/g)` + NAB2$`NAB9 C-Pass dSVI 5 (mL/g)`))
+
+NAB2$'NAB4 and 9 C-Pass dSVI 5 (mL/g)'[NAB2$'NAB4 and 9 C-Pass dSVI 5 (mL/g)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'NAB4 C-Pass dSVI 5 (mL/g)', -'NAB9 C-Pass dSVI 5 (mL/g)')
+
+# c-pass TSS
+
+
+NAB2$`NAB9 C-Pass TSS (LAB) (mg/L)`[is.na(NAB2$`NAB9 C-Pass TSS (LAB) (mg/L)`)] <- 0
+NAB2$`NAB4 C-Pass TSS (LAB) (mg/L)`[is.na(NAB2$`NAB4 C-Pass TSS (LAB) (mg/L)`)] <- 0
+
+NAB2 <- mutate(NAB2, "NAB4 and 9 C-Pass TSS (LAB) (mg/L)" = 
+              (NAB2$`NAB9 C-Pass TSS (LAB) (mg/L)` + NAB2$`NAB4 C-Pass TSS (LAB) (mg/L)`))
+
+NAB2$'NAB4 and 9 C-Pass TSS (LAB) (mg/L)'[NAB2$'NAB4 and 9 C-Pass TSS (LAB) (mg/L)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'NAB9 C-Pass TSS (LAB) (mg/L)', -'NAB4 C-Pass TSS (LAB) (mg/L)')
+
+#ABXA NO5
+
+
+NAB2$`AB4A NO5 (mg N/L)`[is.na(NAB2$`AB4A NO5 (mg N/L)`)] <- 0
+NAB2$`AB9A NO5 (mg N/L)`[is.na(NAB2$`AB9A NO5 (mg N/L)`)] <- 0
+
+NAB2 <- mutate(NAB2, "AB4 and 9A NO5 (mg N/L)" = 
+              (NAB2$`AB4A NO5 (mg N/L)` + NAB2$`AB9A NO5 (mg N/L)`))
+
+NAB2$'AB4 and 9A NO5 (mg N/L)'[NAB2$'AB4 and 9A NO5 (mg N/L)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'AB4A NO5 (mg N/L)', -'AB9A NO5 (mg N/L)')
+
+# ABXA NH3
+
+NAB2$`AB4A NH3 (mg N/L)`[c(1:143, 297:435)] <- 0
+NAB2$`AB9A NH3 (mg N/L)`[144:296] <- 0
+
+NAB2 <- mutate(NAB2, "AB4 and 9A NH3 (mg N/L)" = 
+              (NAB2$`AB4A NH3 (mg N/L)` + NAB2$`AB9A NH3 (mg N/L)`))
+
+NAB2$'AB4 and 9A NH3 (mg N/L)'[NAB2$'AB4 and 9A NH3 (mg N/L)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'AB4A NH3 (mg N/L)', -'AB9A NH3 (mg N/L)')
+
+#ABXC NH3
+
+
+NAB2$`AB4C NH3 (mg N/L)`[c(1:143, 298:435)] <- 0
+NAB2$`AB9C NH3 (mg N/L)`[144:297] <- 0
+
+NAB2 <- mutate(NAB2, "AB4 and 9C NH3 (mg N/L)" = 
+              (NAB2$`AB4C NH3 (mg N/L)` + NAB2$`AB9C NH3 (mg N/L)`))
+
+NAB2$'AB4 and 9C NH3 (mg N/L)'[NAB2$'AB4 and 9C NH3 (mg N/L)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'AB4C NH3 (mg N/L)', -'AB9C NH3 (mg N/L)')
+
+# ABX3 MLSS
+
+NAB2$`AB4C MLSS (mg N/L)`[c(1:143, 297:435)] <- 0
+NAB2$`AB9C MLSS (mg/L)`[143:296] <- 0
+
+NAB2 <- mutate(NAB2, "AB4 and 9C MLSS (mg N/L)" = 
+              (NAB2$`AB4C MLSS (mg N/L)` + NAB2$`AB9C MLSS (mg/L)`))
+
+
+NAB2$'AB4 and 9C MLSS (mg N/L)'[NAB2$'AB4 and 9C MLSS (mg N/L)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'AB4C MLSS (mg N/L)', -'AB9C MLSS (mg/L)')
+
+#ABX INF FLOW
+
+
+NAB2$`AB4 INF FLOW (MGD)`[c(1:143, 296:435)] <- 0
+NAB2$`AB9 INF FLOW (MGD)`[144:295] <- 0
+
+NAB2 <- mutate(NAB2, "AB4 and 9 INF FLOW (MGD)" = 
+              (NAB2$`AB4 INF FLOW (MGD)` + NAB2$`AB9 INF FLOW (MGD)`))
+
+NAB2$'AB4 and 9 INF FLOW (MGD)'[NAB2$'AB4 and 9 INF FLOW (MGD)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'AB4 INF FLOW (MGD)', -'AB9 INF FLOW (MGD)')
+
+#ABX MLR FLOW
+
+NAB2$`AB4 MLR FLOW (MGD)`[297:435] <- 0
+NAB2$`AB9 MLR FLOW (MGD)`[1:296] <- 0
+
+NAB2 <- mutate(NAB2, "AB4 and 9 MLR FLOW (MGD)" = 
+              (NAB2$`AB4 MLR FLOW (MGD)` + NAB2$`AB9 MLR FLOW (MGD)`))
+
+NAB2$'AB4 and 9 MLR FLOW (MGD)'[NAB2$'AB4 and 9 MLR FLOW (MGD)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'AB4 MLR FLOW (MGD)', -'AB9 MLR FLOW (MGD)')
+
+#C-Pass VSS
+
+NAB2$`NAB4 C-Pass VSS (LAB) (mg/L)`[is.na(NAB2$`NAB4 C-Pass VSS (LAB) (mg/L)`)] <- 0
+NAB2$`NAB9 C-Pass VSS (LAB) (mg/L)`[is.na(NAB2$`NAB9 C-Pass VSS (LAB) (mg/L)`)] <- 0
+
+NAB2 <- mutate(NAB2, "NAB4 and 9 C-Pass VSS (LAB) (mg/L)" = 
+              (NAB2$`NAB4 C-Pass VSS (LAB) (mg/L)` + NAB2$`NAB9 C-Pass VSS (LAB) (mg/L)`))
+
+NAB2$'NAB4 and 9 C-Pass VSS (LAB) (mg/L)'[NAB2$'NAB4 and 9 C-Pass VSS (LAB) (mg/L)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'NAB4 C-Pass VSS (LAB) (mg/L)', -'NAB9 C-Pass VSS (LAB) (mg/L)')
+
+#C-Pass total COD
+
+
+NAB2$`NAB4 C-Pass Total COD (LAB) (mg/L)`[is.na(NAB2$`NAB4 C-Pass Total COD (LAB) (mg/L)`)] <- 0
+NAB2$`NAB9 C-Pass Total COD (LAB) (mg/L)`[is.na(NAB2$`NAB9 C-Pass Total COD (LAB) (mg/L)`)] <- 0
+
+NAB2 <- mutate(NAB2, "NAB4 and 9 C-Pass Total COD (LAB) (mg/L)" = 
+              (NAB2$`NAB4 C-Pass Total COD (LAB) (mg/L)` + NAB2$`NAB9 C-Pass Total COD (LAB) (mg/L)`))
+
+NAB2$'NAB4 and 9 C-Pass Total COD (LAB) (mg/L)'[NAB2$'NAB4 and 9 C-Pass Total COD (LAB) (mg/L)' == 0] <- NA
+NAB2 <- NAB2 %>% select(-'NAB4 C-Pass Total COD (LAB) (mg/L)', -'NAB9 C-Pass Total COD (LAB) (mg/L)')
+
+## normal effluent variables just need to be log transformed
+NAB2$log_pilot_NAB2 <- log(NAB2$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+NAB2$log_control_NAB2 <- log(NAB2$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+
+```
+
+
+Select some Pilot factors
+```{r}
+# Convert "timestamp" column to a date vector
+ASRT_main$timestamp <- as.Date(ASRT_main$timestamp, format = "%Y/%m/%d")
+ASRT_other$timestamp <- as.Date(ASRT_other$timestamp, format = "%Y/%m/%d")
+EPS <- EPS %>% rename(timestamp = 1)
+
+
+#select pilot variables
+pilot_eps <- EPS %>% select(timestamp, starts_with("Pilot"))
+colnames(pilot_eps) <- c("timestamp", "pilot_total_cod_mgcod_per_gvss",
+                  "pilot_total_pn_to_ps", "pilot_lb_cod_mgcod_per_gvss",
+                  "pilot_lb_proteins_mg_per_gvss", "pilot_lb_carbs_mg_per_gvss",
+                  "pilot_tb_cod_mgcod_per_gvss", "pilot_tb_proteins_mg_per_gvss",
+                  "pilot_tb_carbs_mgcarb_per_gvss", "pilot_tb_pn_to_ps")
+
+#get NAB2 factors
+others <- NAB2 %>% select(timestamp,
+                          "log_pilot_NAB2",
+                          "Clarifier 2 SLR (ppd/sf)",                          
+                          "Clarifier 2 SOR (gpd/sf)",                              
+                          "NAB2 C-Pass Total COD (LAB) (mg/L)",
+                          "NAB2 C-Pass TKNH (LAB) (mg/L)",
+                          "NAB2 C-Pass TSS (LAB) (mg/L)",
+                          "NAB2 C-Pass VSS (LAB) (mg/L)", 
+                          "AB2A DO (mg/L)", 
+                          "AB2B DO (mg/L)",
+                          "AB2C DO (mg/L)",
+                          "AB2A NO5 (mgN/L)", 
+                          "AB2A NH3 (mg N/L)", 
+                          "AB2C NH3 (mg N/L)" , 
+                          "AB2C MLSS (mg/L)", 
+                          "AB2 INF FLOW (MGD)", 
+                          "AB2 MLR FLOW (MGD)", 
+                          "AB2A AIRFLOW (SCFM)", 
+                          "AB2B AIRFLOW (SCFM)", 
+                          "AB2C AIRFLOW (SCFM)", 
+                          "SC2 BLANKET (ft)", 
+                          "NAB2 C-Pass dSVI 30 (mL/g)", 
+                          "NAB2 C-Pass dSVI 5 (mL/g)"  
+                          ,"NAB2 Clarifier Effluent Total COD (Low Level) (LAB) (mg/L)"  
+,"NAB2 Clarifier Effluent NH3 (LAB) (mg/L)"                  
+,"NAB2 Clarifier Effluent NO2 (LAB) (mg/L)"                  
+,"NAB2 Clarifier Effluent NO5 (LAB) (mg/L)"                  
+,"NAB2 Clarifier Effluent OP (LAB) (mg/L)"                             
+,"NAB2 Clarifier Effluent PWS (LAB) (mg/L)"                  
+,"NAB2 Clarifier Effluent PW (LAB) (mg/L)"                   
+,"NAB2 Clarifier Effluent TKNH (LAB) (mg/L)"                 
+,"NAB2 Clarifier Effluent TSS (LAB) (mg/L)"                  
+,"NAB2 Clarifier Effluent VSS (LAB) (mg/L)"
+                          )
+
+colnames(others) <- c(
+  "timestamp",
+  "log_ecoli",
+  "CLARIFIER_2_SLR",
+  "CLARIFIER_2_SOR",
+  "NAB2_CPASS_TOTAL_COD",
+  "NAB2_CPASS_TKNH",
+  "NAB2_CPASS_TSS",
+  "NAB2_CPASS_VSS",
+  "AB2A_DO",
+  "AB2B_DO",
+  "AB2C_DO",
+  "AB2A_NO5",
+  "AB2A_NH3",
+  "AB2C_NH3",
+  "AB2C_MLSS",
+  "AB2_INF_FLOW",
+  "AB2_MLR_FLOW",
+  "AB2A_AIRFLOW",
+  "AB2B_AIRFLOW",
+  "AB2C_AIRFLOW",
+  "SC2_BLANKET",
+  "NAB2_CPASS_dSVI30",
+  "NAB2_CPASS_dSVI5",
+  "NAB2_CLARIFIER_EFFLUENT_TOTAL_COD",
+  "NAB2_CLARIFIER_EFFLUENT_NH3",
+  "NAB2_CLARIFIER_EFFLUENT_NO2",
+  "NAB2_CLARIFIER_EFFLUENT_NO5",
+  "NAB2_CLARIFIER_EFFLUENT_OP",
+  "NAB2_CLARIFIER_EFFLUENT_PWS",
+  "NAB2_CLARIFIER_EFFLUENT_PW",
+  "NAB2_CLARIFIER_EFFLUENT_TKNH",
+  "NAB2_CLARIFIER_EFFLUENT_TSS",
+  "NAB2_CLARIFIER_EFFLUENT_VSS"
+)
+
+
+#get ASRT-other variables for pilot
+ASRT_other_pilot <- ASRT_other %>% select(timestamp, starts_with("Pilot"))
+colnames(ASRT_other_pilot) <- c("timestamp",
+                                "Pilot_ASRT_d",
+                                "Pilot_Floc_SRT_d",
+                                "Pilot_Granule_SRT_d",
+                                "Pilot_AGS_Weighted_SRT_d",
+                                "Pilot_Floc_percent",
+                                "Pilot_Granule_percent")
+
+#Join
+pilot_eps <- left_join(pilot_eps, others, by = "timestamp")
+pilot_eps <- left_join(pilot_eps, ASRT_main[,-3], by = "timestamp")
+pilot_eps <- left_join(pilot_eps, ASRT_other_pilot, by = "timestamp")
+
+```
+
+Select Control Factors
+```{r}
+#select control variables
+control_eps <- EPS %>% select(timestamp, starts_with("Control"))
+colnames(control_eps) <- c("timestamp", "control_total_cod_mgcod_per_gvss",
+                  "control_total_pn_to_ps", "control_lb_cod_mgcod_per_gvss",
+                  "control_lb_proteins_mg_per_gvss", "control_lb_carbs_mg_per_gvss",
+                  "control_tb_cod_mgcod_per_gvss", "control_tb_proteins_mg_per_gvss",
+                  "control_tb_carbs_mgcarb_per_gvss", "control_tb_pn_to_ps")
+
+#get NAB2 factors
+others <- NAB2 %>% select(timestamp,
+"log_control_NAB2",
+"Clarifier 9 SLR (ppd/sf)"                                  
+,"Clarifier 9 SOR (gpd/sf)" 
+,"AB9A DO (mg/L)"      
+,"AB9B DO (mg/L)"                                            
+,"AB9C DO (mg/L)" 
+,"AB9A AIRFLOW (SCFM)"   
+,"AB9B AIRFLOW (SCFM)"                                       
+,"AB9C AIRFLOW (SCFM)"   
+,"SC9 BLANKET (ft)"   
+,"NNE Total COD (Low Level) (LAB) (mg/L)"                     
+,"NNE NH3A (LAB) (mg/L)"                                     
+,"NNE NO2 (LAB) (mg/L)"                                       
+,"NNE NO5 (LAB) (mg/L)"                                      
+,"NNE OP (LAB) (mg/L)"                                        
+,"NNE PWS (LAB) (mg/L)"                                      
+,"NNE PW (LAB) (mg/L)"                                       
+,"NNE TKNH (LAB) (mg/L)"                                     
+,"NNE TSS (LAB) (mg/L)"                                       
+,"NNE VSS (LAB) (mg/L)"
+,"NAB4 and 9 C-Pass Total COD (LAB) (mg/L)"
+,"NAB4 and 9 C-Pass VSS (LAB) (mg/L)"
+,"NAB4 and 9 C-Pass TKNH (LAB) (mg/L)"
+,"NAB4 and 9 C-Pass dSVI 30 (mL/g)"                                
+,"NAB4 and 9 C-Pass dSVI 5 (mL/g)"
+,"NAB4 and 9 C-Pass TSS (LAB) (mg/L)"
+,"AB4 and 9A NO5 (mg N/L)"
+,"AB4 and 9A NH3 (mg N/L)" 
+,"AB4 and 9C NH3 (mg N/L)" 
+,"AB4 and 9C MLSS (mg N/L)" 
+,"AB4 and 9 INF FLOW (MGD)"  
+,"AB4 and 9 MLR FLOW (MGD)"
+                          )
+
+colnames(others) <- new_names_vector <- c(
+  "timestamp",
+  "log_ecoli",
+  "CLARIFIER_9_SLR",
+  "CLARIFIER_9_SOR",
+  "AB9A_DO",
+  "AB9B_DO",
+  "AB9C_DO",
+  "AB9A_AIRFLOW",
+  "AB9B_AIRFLOW",
+  "AB9C_AIRFLOW",
+  "SC9_BLANKET",
+  "NNE_TOTAL_COD",
+  "NNE_NH3A",
+  "NNE_NO2",
+  "NNE_NO5",
+  "NNE_OP",
+  "NNE_PWS",
+  "NNE_PW",
+  "NNE_TKNH",
+  "NNE_TSS",
+  "NNE_VSS",
+  
+  "NAB4_and_9_CPASS_TOTAL_COD",
+  "NAB4_and_9_CPASS_VSS",
+  "NAB4_and_9_CPASS_TKNH",
+  "NAB4_and_9_CPASS_dSVI30",
+  "NAB4_and_9_CPASS_dSVI5",
+  "NAB4_and_9_CPASS_TSS",
+  "AB4_and_9A_NO5",
+  "AB4_and_9A_NH3",
+  "AB4_and_9C_NH3",
+  "AB4_and_9C_MLSS",
+  "AB4_and_9_INF_FLOW",
+  "AB4_and_9_MLR_FLOW"
+)
+
+# Reorder to match correspongind pilot variables
+others <- others %>%
+  select(
+    timestamp,
+    log_ecoli,
+    CLARIFIER_9_SLR,
+    CLARIFIER_9_SOR,
+    NAB4_and_9_CPASS_TOTAL_COD,
+    NAB4_and_9_CPASS_TKNH,
+    NAB4_and_9_CPASS_TSS,
+    NAB4_and_9_CPASS_VSS,
+    AB9A_DO,
+    AB9B_DO,
+    AB9C_DO,
+    AB4_and_9A_NO5,
+    AB4_and_9A_NH3,
+    AB4_and_9C_NH3,
+    AB4_and_9C_MLSS,
+    AB4_and_9_INF_FLOW,
+    AB4_and_9_MLR_FLOW,
+    AB9A_AIRFLOW,
+    AB9B_AIRFLOW,
+    AB9C_AIRFLOW,
+    SC9_BLANKET,
+    NAB4_and_9_CPASS_dSVI30,
+    NAB4_and_9_CPASS_dSVI5,
+    NNE_TOTAL_COD,
+    NNE_NH3A,
+    NNE_NO2,
+    NNE_NO5,
+    NNE_OP,
+    NNE_PWS,
+    NNE_PW,
+    NNE_TKNH,
+    NNE_TSS,
+    NNE_VSS
+  )
+
+#get other ASRT variables for pilot
+ASRT_other_control <- ASRT_other %>% select(timestamp, starts_with("Control"))
+colnames(ASRT_other_control) <- c("timestamp",
+                                "Control_ASRT_d",
+                                "Control_Floc_SRT_d",
+                                "Control_Granule_SRT_d",
+                                "Control_AGS_Weighted_SRT_d",
+                                "Control_Floc_percent",
+                                "Control_Granule_percent")
+
+
+#FILL method to fill in missing EPS and ASRT values
+control_eps <- left_join(control_eps, others, by = "timestamp")
+control_eps <- left_join(control_eps, ASRT_main[,-2], by = "timestamp")
+control_eps <- left_join(control_eps, ASRT_other_control, by = "timestamp")
+
+view(control_eps$AB4_and_9_INF_FLOW)
+
+
+```
+
+Combine dataframes with factorial variable
+```{r}
+# Mutate 'system' variable to be a factor with all 2s for pilot and all 9s for control
+pilot_eps<- pilot_eps %>%
+  mutate(system = factor(rep(2, nrow(pilot_eps))))
+
+control_eps <- control_eps %>%
+  mutate(system = factor(rep(9, nrow(control_eps))))
+
+
+new_column_names <- c(
+"timestamp"                              
+,"total_cod_mgcod_per_gvss"        
+,"total_pn_to_ps"                   
+,"lb_cod_mgcod_per_gvss"           
+,"lb_proteins_mg_per_gvss"          
+,"lb_carbs_mg_per_gvss"            
+,"tb_cod_mgcod_per_gvss"            
+,"tb_proteins_mg_per_gvss"         
+,"tb_carbs_mgcarb_per_gvss"         
+,"tb_pn_to_ps"      
+,"log_ecoli"
+,"CLARIFIER_X_SLR"                        
+,"CLARIFIER_X_SOR"                       
+,"NABX_CPASS_TOTAL_COD"                   
+,"NABX_CPASS_TKNH"                       
+,"NABX_CPASS_TSS"                         
+,"NABX_CPASS_VSS"                        
+,"ABXA_DO"                                
+,"ABXB_DO"                               
+,"ABXC_DO"                                
+,"ABXA_NO5"                              
+,"ABXA_NH3"                               
+,"ABXC_NH3"                              
+,"ABXC_MLSS"                              
+,"ABX_INF_FLOW"                          
+,"ABX_MLR_FLOW"                           
+,"ABXA_AIRFLOW"                          
+,"ABXB_AIRFLOW"                           
+,"ABXC_AIRFLOW"                          
+,"SCX_BLANKET"                            
+,"NABX_CPASS_dSVI30"                     
+,"NABX_CPASS_dSVI5"                       
+,"NABX_CLARIFIER_EFFLUENT_TOTAL_COD"     
+,"NABX_CLARIFIER_EFFLUENT_NH3"            
+,"NABX_CLARIFIER_EFFLUENT_NO2"           
+,"NABX_CLARIFIER_EFFLUENT_NO5"            
+,"NABX_CLARIFIER_EFFLUENT_OP"            
+,"NABX_CLARIFIER_EFFLUENT_PWS"            
+,"NABX_CLARIFIER_EFFLUENT_PW"            
+,"NABX_CLARIFIER_EFFLUENT_TKNH"           
+,"NABX_CLARIFIER_EFFLUENT_TSS"           
+,"NABX_CLARIFIER_EFFLUENT_VSS"            
+,"NAB2_ASRT"                       
+,"ASRT_d"                           
+,"Floc_SRT_d"                      
+,"Granule_SRT_d"                    
+,"AGS_Weighted_SRT_d"              
+,"Floc_percent"                     
+,"Granule_percent"  
+,"system"
+                      )
+
+
+pilot_eps <- setNames(pilot_eps, new_column_names)
+control_eps <- setNames(control_eps, new_column_names)
+
+# Stack the dataframes vertically and change column names
+all_casdas <- rbind(pilot_eps, control_eps)
+
+
+# Turn zeroing out to NA values
+all_casdas$'ABXA_NO5'[all_casdas$'ABXA_NO5' == 0] <- NA
+all_casdas$'ABXA_NH3'[all_casdas$'ABXA_NH3' == 0] <- NA
+all_casdas$'ABXC_MLSS'[all_casdas$'ABXC_MLSS' == 0] <- NA
+all_casdas$'ABX_INF_FLOW'[all_casdas$'ABX_INF_FLOW' == 0] <- NA
+all_casdas$'ABX_MLR_FLOW'[all_casdas$'ABX_MLR_FLOW' == 0] <- NA
+
+```
+
+
+Make Distributions
+```{r}
+
+# Get the variable names from columns 2-49
+variable_names <- names(all_casdas)[2:49]
+
+# Perform comparison for each variable
+for (variable in variable_names) {
+  # Filter data for system 2 and system 9
+  system_2 <- all_casdas[all_casdas$system == 2, variable]
+  system_9 <- all_casdas[all_casdas$system == 9, variable]
+
+  # Create density plots
+  plot <- ggplot(all_casdas, aes(x = .data[[variable]], fill = factor(system))) +
+    geom_density(alpha = 0.5) +
+    labs(x = variable, y = "Density", title = paste("Density Curves of", variable)) +
+    scale_fill_discrete(name = "System")
+
+  # Print the plot
+  print(plot)
+}
+
+```
+
+
+Make t-tests in table
+```{r}
+# Create an empty dataframe to store the results
+t_tests <- data.frame(
+  Variable = character(),
+  T_Statistic = numeric(),
+  P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Get the variable names from columns 2-49
+variable_names <- names(all_casdas)[2:49]
+
+# Perform comparison for each variable
+for (variable in variable_names) {
+  # Filter data for system 2 and system 9
+  system_2 <- all_casdas[all_casdas$system == 2, variable]
+  system_9 <- all_casdas[all_casdas$system == 9, variable]
+
+  # Perform two-sample t-test
+  t_test_result <- t.test(system_2, system_9)
+  
+  # Extract relevant information from the t-test result
+  variable_name <- variable
+  t_statistic <- t_test_result$statistic
+  p_value <- t_test_result$p.value
+  
+  # Create a new row in the results dataframe
+  new_row <- data.frame(
+    Variable = variable_name,
+    T_Statistic = t_statistic,
+    P_Value = p_value,
+    stringsAsFactors = FALSE
+  )
+  
+  # Append the new row to the results dataframe
+  t_tests <- rbind(t_tests, new_row)
+}
+
+# Print the results dataframe
+print(t_tests)
+
+
+```
+
+
+Confidence intervals
+```{r}
+# Create an empty dataframe to store the results
+confidence_intervals <- data.frame(
+  Variable = character(),
+  Percentile_0.025_System_9 = numeric(),
+  Percentile_0.975_System_9 = numeric(),
+  Percentile_0.025_System_2 = numeric(),
+  Percentile_0.975_System_2 = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Get the variable names from columns 2-49
+variable_names <- names(all_casdas)[2:49]
+
+# Perform calculation for each variable
+for (variable in variable_names) {
+  # Filter data for system 2 and system 9
+  system_2 <- all_casdas[all_casdas$system == 2, variable]
+  system_9 <- all_casdas[all_casdas$system == 9, variable]
+
+  # Calculate percentiles for system 9
+  percentile_0.025_system_9 <- quantile(system_9, 0.025, na.rm = TRUE)
+  percentile_0.975_system_9 <- quantile(system_9, 0.975, na.rm = TRUE)
+
+  # Calculate percentiles for system 2
+  percentile_0.025_system_2 <- quantile(system_2, 0.025, na.rm = TRUE)
+  percentile_0.975_system_2 <- quantile(system_2, 0.975, na.rm = TRUE)
+
+  # Create a new row in the results dataframe
+  new_row <- data.frame(
+    Variable = variable,
+    Percentile_0.025_System_9 = percentile_0.025_system_9,
+    Percentile_0.975_System_9 = percentile_0.975_system_9,
+    Percentile_0.025_System_2 = percentile_0.025_system_2,
+    Percentile_0.975_System_2 = percentile_0.975_system_2,
+    stringsAsFactors = FALSE
+  )
+
+  # Append the new row to the results dataframe
+  confidence_intervals <- rbind(confidence_intervals, new_row)
+}
+
+# Print the results dataframe
+print(confidence_intervals)
+
+```
+
+
+Make Boxplot to compare lasso selections
+```{r}
+# Subset the data for control and pilot
+pilot <- all_casdas[all_casdas$system == 2, ]
+control <- all_casdas[all_casdas$system == 9, ]
+
+
+# Pn to ps
+variable_name <- "total_pn_to_ps"
+
+# Create a new plot
+plot1 <- ggplot() +
+  # Boxplots
+  geom_boxplot(data = rbind(pilot, control), aes(x = factor(system), y = .data[[variable_name]])) +
+  # Axis labels and plot title
+  labs(x = "System", y = "Total Protein to Carb Ratio (mg/mg)") +
+  ggtitle(paste("Comparison of", "Total Protein to Carb Ratio", "between System 2 and System 9")) +
+  # Change x-axis labels
+  scale_x_discrete(labels = c("Pilot", "Control")) +
+  # Modify the theme
+  theme(panel.background = element_rect(fill = "#FF9A7B"))
+
+print(plot1)
+
+#ABA airflow
+variable_name <- "ABXA_AIRFLOW"
+
+# Create a new plot
+plot2 <- ggplot() +
+  # Boxplots
+  geom_boxplot(data = rbind(pilot, control), aes(x = factor(system), y = .data[[variable_name]])) +
+  # Axis labels and plot title
+  labs(x = "System", y = "Aeration Basin A Airflow (SCFM)") +
+  ggtitle(paste("Comparison of", "Aeration Basin A Airflow", "between System 2 and System 9")) +
+  # Change x-axis labels
+  scale_x_discrete(labels = c("Pilot", "Control")) +
+  # Modify the theme
+  theme(panel.background = element_rect(fill = "#FF9A7B"))
+
+#ABA airflow
+variable_name <- "ABXC_AIRFLOW"
+
+# Create a new plot
+plot3 <- ggplot() +
+  # Boxplots
+  geom_boxplot(data = rbind(pilot, control), aes(x = factor(system), y = .data[[variable_name]])) +
+  # Axis labels and plot title
+  labs(x = "System", y = "Aeration Basin C Airflow (SCFM)") +
+  ggtitle(paste("Comparison of", "Aeration Basin C Airflow", "between System 2 and System 9")) +
+  # Change x-axis labels
+  scale_x_discrete(labels = c("Pilot", "Control")) +
+  # Modify the theme
+  theme(panel.background = element_rect(fill = "#FF9A7B"))
+
+
+#NABX_CLARIFIER_EFFLUENT_NO5
+variable_name <- "NABX_CLARIFIER_EFFLUENT_NO5"
+
+# Create a new plot
+plot4 <- ggplot() +
+  # Boxplots
+  geom_boxplot(data = rbind(pilot, control), aes(x = factor(system), y = .data[[variable_name]])) +
+  # Axis labels and plot title
+  labs(x = "System", y = "Clarifier Effluent NO5 (mg/L)") +
+  ggtitle(paste("Comparison of", "Clarifier Effluent NO5", "between System 2 and System 9")) +
+  # Change x-axis labels
+  scale_x_discrete(labels = c("Pilot", "Control")) +
+  # Modify the theme
+  theme(panel.background = element_rect(fill = "#FF9A7B"))
+
+
+#Floc_percent
+variable_name <- "Floc_percent"
+
+# Create a new plot
+plot5 <- ggplot() +
+  # Boxplots
+  geom_boxplot(data = rbind(pilot, control), aes(x = factor(system), y = .data[[variable_name]])) +
+  # Axis labels and plot title
+  labs(x = "System", y = "Floc Mass Fraction (%)") +
+  ggtitle(paste("Comparison of", "Floc Mass Fraction", "between System 2 and System 9")) +
+  # Change x-axis labels
+  scale_x_discrete(labels = c("Pilot", "Control")) +
+  # Modify the theme
+  theme(panel.background = element_rect(fill = "#D1FFC9"))
+
+#Granule_percent
+variable_name <- "Granule_percent"
+
+# Create a new plot
+plot6 <- ggplot() +
+  # Boxplots
+  geom_boxplot(data = rbind(pilot, control), aes(x = factor(system), y = .data[[variable_name]])) +
+  # Axis labels and plot title
+  labs(x = "System", y = "Granule Mass Fraction (%)") +
+  ggtitle(paste("Comparison of", "Granule Mass Fraction", "between System 2 and System 9")) +
+  # Change x-axis labels
+  scale_x_discrete(labels = c("Pilot", "Control")) +
+  # Modify the theme
+  theme(panel.background = element_rect(fill = "#FF9A7B"))
+
+
+
+print(plot1)
+print(plot2)
+print(plot3)
+print(plot4)
+print(plot5)
+print(plot6)
+
+```
+
+
+Make Boxplots for confidence interval 
