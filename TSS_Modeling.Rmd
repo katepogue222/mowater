@@ -93,7 +93,7 @@ plot(cv_model)
 
 #Extract Optimal Lambda
 opt_lambda <- cv_model$lambda.1se
-lasso_model <- glmnet(x, y, alpha = 1, family = "gaussian", lambda = opt_lambda)
+lasso_model <- glmnet(x, y, alpha = 1, family = "gaussian", lambda = .15)
 plot(lasso_model)
 coef(lasso_model)
 
@@ -234,26 +234,19 @@ Graph a linear Model
 ```{r}
 # Assuming you have already defined the linear model
 linear.model <- lm(`AI-K530N` ~ 
-                     `total_pn_to_ps` +
-                     `NABX_CPASS_VSS` +
-                     `ABXA_NO5` +
-                     `ABXC_NH3` +
-                     `ABX_MLR_FLOW` +
-                     `SCX_BLANKET`
+                   + `ABXA_NO5` 
+                   + `ABXC_NH3` 
+                   + `SCX_BLANKET`
                    + `NABX_CPASS_dSVI30`
                    + `NABX_CLARIFIER_EFFLUENT_TOTAL_COD`
-                   + `NABX_CLARIFIER_EFFLUENT_NH3`
                    + `NABX_CLARIFIER_EFFLUENT_NO2`
-                   + `Solids Wasted via WAS (tpd)`
                    + `NSI E. coli (LAB) (EC/100mL)`
+                   + `NSI NO5 (LAB) (mg/L)`
                    + `NSI PWS (LAB) (mg/L)`
-                   + `NSI TSS (LAB) (mg/L)`
                    + `NSI TVAH (LAB) (mg/L)`
-                   + `NSI COD (mg/L)`
                    + `NSI FLOW (MGD)`
                    + `NSI TEMP (C)`
                    + `ASRT_d`
-                   + `Granule_SRT_d`
                    , data = all_tss_filled)
 
 # Extract the observed and predicted values
@@ -274,11 +267,12 @@ ggplot(data, aes(x = timestamp, y = observed)) +
   geom_point(color = "blue", aes(shape = "Observed")) +
   geom_point(aes(y = predicted, color = "Predicted"), shape = 16) +
   geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2, color = "red") +  # Adding error bars
-  labs(x = "Time", y = "Observed and Predicted TSS ", title = "Observed and Predicted Effluent TSS Over Time") +
+  labs(x = "Time", y = "Observed and Predicted TSS (mg/L)", title = "Observed and Predicted Effluent TSS Over Time") +
   theme_minimal() +
   theme(legend.position = "right") +
   scale_shape_manual(name = "", values = c("Observed" = 16), labels = c("Observed")) +
   scale_color_manual(name = "", values = c("Predicted" = "red"), labels = c("Predicted"))
 
+summary(linear.model)
 
 ```
