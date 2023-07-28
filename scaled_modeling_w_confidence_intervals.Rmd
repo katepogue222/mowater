@@ -14,7 +14,6 @@ Loading Packages
 library(glmnet)
 library(tidyverse)
 library(randomForest)
-
 ```
 
 
@@ -243,35 +242,42 @@ interval <- data.frame(predictor = c("(Intercept)", colnames(x_selected)[-c(1,12
 
 Graph a linear Model
 ```{r}
-
-# Fit a linear model
+# Assuming you have already defined the linear model
 linear.model <- lm(log_ecoli ~ ABXC_AIRFLOW +
-                   `NSEC MIN ASRT (days)` +
-                   `NSI Total COD (LAB) (mg/L)` +
-                   `NSI E. coli (LAB) (EC/100mL)` +
-                   `NSI NO2 (LAB) (mg/L)` +
-                   `NSI sCOD (mg/L)`, data = all_eps_filled)
+                     `NSEC MIN ASRT (days)` +
+                     `NSI Total COD (LAB) (mg/L)` +
+                     `NSI E. coli (LAB) (EC/100mL)` +
+                     `NSI NO2 (LAB) (mg/L)` +
+                     `NSI sCOD (mg/L)`, data = all_eps_filled)
 
 # Extract the observed and predicted values
 observed <- all_eps_filled$log_ecoli
 predicted <- predict(linear.model)
 
-# Create a scatter plot of observed vs predicted values
-plot(observed, predicted, xlab = "Observed Values", ylab = "Predicted Values", main = "Observed vs Predicted Values")
-abline(0, 1, col = "red")  # Add a reference line with slope 1 and intercept 0
-
-
 # Create a data frame with timestamp, observed, and predicted values
 data <- data.frame(timestamp = all_eps_filled$timestamp, observed = observed, predicted = predicted)
 
+# Get the 95% confidence intervals for the predicted values (level is .99 to account for 52 points)
+conf_interval <- predict(linear.model, interval = "confidence", level = 0.99)
+
+# Combine predicted values and confidence intervals into a single data frame
+data <- cbind(data, conf_interval)
+
 # Create a scatter plot with timestamp on the x-axis
 ggplot(data, aes(x = timestamp, y = observed)) +
-  geom_point(color = "blue") +
-  geom_point(aes(y = predicted), color = "red") +
-  labs(x = "Time", y = "Observed and Predicted Values", title = "Observed and Predicted Values Over Time") +
+  geom_point(color = "blue", aes(shape = "Observed")) +
+  geom_point(aes(y = predicted, color = "Predicted"), shape = 16) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2, color = "red") +  # Adding error bars
+  labs(x = "Time", y = "Observed and Predicted E. coli Concentrations (log(EC/100mL))", title = "Observed and Predicted E. coli Concentrations Over Time") +
   theme_minimal() +
-  theme(legend.position = "top") +
-  scale_color_manual(values = c("blue", "red"), labels = c("Observed", "Predicted"))
+  theme(legend.position = "right") +
+  scale_shape_manual(name = "", values = c("Observed" = 16), labels = c("Observed")) +
+  scale_color_manual(name = "", values = c("Predicted" = "red"), labels = c("Predicted"))
+
+
+#Get other information about this model
+
+summary(linear.model)
 
 ```
 
@@ -479,60 +485,39 @@ interval <- data.frame(predictor = c("(Intercept)", colnames(x_selected)[-c(1,12
 
 Graph a linear Model
 ```{r}
-# Fit a linear model
+# Assuming you have already defined the linear model
 linear.model <- lm(log_reduction ~ NABX_CLARIFIER_EFFLUENT_NH3 +
-                     `NSEC MIN ASRT (days)` +
-                     `NSI NH3 (mg N/L)` , data = all_eps_filled)
+                     `NSEC ACTUAL ASRT (days)` +
+                     `NSI NH3 (mg N/L)`, data = all_eps_filled)
 
 # Extract the observed and predicted values
 observed <- all_eps_filled$log_reduction
 predicted <- predict(linear.model)
 
-# Create a scatter plot of observed vs predicted values
-plot(observed, predicted, xlab = "Observed Values", ylab = "Predicted Values", main = "Observed vs Predicted Values")
-abline(0, 1, col = "red")  # Add a reference line with slope 1 and intercept 0
-
-
 # Create a data frame with timestamp, observed, and predicted values
 data <- data.frame(timestamp = all_eps_filled$timestamp, observed = observed, predicted = predicted)
 
+# Get the 99% confidence intervals for the predicted values
+conf_interval <- predict(linear.model, interval = "confidence", level = 0.99)
+
+# Combine predicted values and confidence intervals into a single data frame
+data <- cbind(data, conf_interval)
+
 # Create a scatter plot with timestamp on the x-axis
 ggplot(data, aes(x = timestamp, y = observed)) +
-  geom_point(color = "blue") +
-  geom_point(aes(y = predicted), color = "red") +
-  labs(x = "Time", y = "Observed and Predicted Values", title = "Observed and Predicted Values Over Time") +
+  geom_point(color = "blue", aes(shape = "Observed")) +
+  geom_point(aes(y = predicted, color = "Predicted"), shape = 16) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2, color = "red") +  # Adding error bars
+  labs(x = "Time", y = "Observed and Predicted E. coli Reduction (log(EC/100mL))", title = "Observed and Predicted E. coli Reduction Over Time") +
   theme_minimal() +
-  theme(legend.position = "top") +
-  scale_color_manual(values = c("blue", "red"), labels = c("Observed", "Predicted"))
+  theme(legend.position = "right") +
+  scale_shape_manual(name = "", values = c("Observed" = 16), labels = c("Observed")) +
+  scale_color_manual(name = "", values = c("Predicted" = "red"), labels = c("Predicted"))
+
+summary(linear.model)
+
 
 ```
 
 
-Try Random Forest
-```{r}
-# Specify the column index of the target variable in your dataset
-target_col <- 2  # Change it to the appropriate column index
-
-# Build the random forest model
-rf_model <- randomForest(data = train[, -c(1:3, 77:79)],
-                         y = train[, 2],
-                         ntree = 100,  # Number of trees in the forest
-                         mtry = floor(sqrt(73)),  # Number of variables to consider at each split
-                         importance = TRUE)  # Calculate variable importance measures
-
-# Print the summary of the model
-print(rf_model)
-
-# Predict using the random forest model
-predictions <- predict(rf_model, newdata = test_data[, -target_col])
-
-# Evaluate the model performance
-accuracy <- sum(predictions == test_data[, target_col]) / length(predictions)
-print(paste("Accuracy:", round(accuracy, 4)))
-
-# Variable importance plot
-var_importance <- importance(rf_model)
-varImpPlot(rf_model)
-
-```
 

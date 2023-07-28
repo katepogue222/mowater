@@ -28,17 +28,6 @@ ASRT_other <- read_excel("data/ASRT_other.xlsx")
 
 
 
-Scratchpad
-```{r}
-compare <- NAB2 %>% select(
-                 "NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)",
-                 "NAB4 Clarifier Effluent E. coli (LAB) (EC/100mL)",
-                 "NSI E. coli (LAB) (EC/100mL)",
-                 "NAB9 Clarifier Effluent E. coli (LAB) (EC/100mL)",
-                 )
-```
-
-
 
 
 make e. coli reduction variable and wrangle ASRT

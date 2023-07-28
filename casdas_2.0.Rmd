@@ -22,7 +22,6 @@ NAB2 <- read_csv("data/NAB2_VER3.csv")
 EPS <- read_excel("data/all_EPS.xlsx")
 ASRT_main <- read_excel("data/ASRT_main.xlsx")
 ASRT_other <- read_excel("data/ASRT_other.xlsx")
-
 ```
 
 
@@ -176,9 +175,27 @@ NAB2 <- mutate(NAB2, "NAB4 and 9 C-Pass Total COD (LAB) (mg/L)" =
 NAB2$'NAB4 and 9 C-Pass Total COD (LAB) (mg/L)'[NAB2$'NAB4 and 9 C-Pass Total COD (LAB) (mg/L)' == 0] <- NA
 NAB2 <- NAB2 %>% select(-'NAB4 C-Pass Total COD (LAB) (mg/L)', -'NAB9 C-Pass Total COD (LAB) (mg/L)')
 
+
+```
+
+
+Create E. coli Reduction Variable and log transform everything
+```{r}
+## make LOG reduction variable
+NAB2$log_pilot_reduction <- log(NAB2$`NSI E. coli (LAB) (EC/100mL)`, base = 10)- log(NAB2$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+
+NAB2$log_control_reduction <- log(NAB2$`NSI E. coli (LAB) (EC/100mL)`, base = 10)-log(NAB2$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+
+
 ## normal effluent variables just need to be log transformed
-NAB2$log_pilot_NAB2 <- log(NAB2$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
-NAB2$log_control_NAB2 <- log(NAB2$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+NAB2$log_pilot_ecoli <- log(NAB2$`NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+NAB2$log_control_ecoli <- log(NAB2$`NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`, base = 10)
+
+
+#only select useful variables
+NAB2 <- NAB2 %>% select(-c(`NSI E. coli (LAB) (EC/100mL)`, 
+                           `NAB2 Clarifier Effluent E. coli (LAB) (EC/100mL)`,
+                          `NAB4 and 9 Clarifier Effluent E. coli (LAB) (EC/100mL)`))
 
 ```
 
@@ -201,7 +218,8 @@ colnames(pilot_eps) <- c("timestamp", "pilot_total_cod_mgcod_per_gvss",
 
 #get NAB2 factors
 others <- NAB2 %>% select(timestamp,
-                          "log_pilot_NAB2",
+                          "log_pilot_ecoli",
+                          "log_pilot_reduction",
                           "Clarifier 2 SLR (ppd/sf)",                          
                           "Clarifier 2 SOR (gpd/sf)",                              
                           "NAB2 C-Pass Total COD (LAB) (mg/L)",
@@ -238,6 +256,7 @@ others <- NAB2 %>% select(timestamp,
 colnames(others) <- c(
   "timestamp",
   "log_ecoli",
+  "log_reduction",
   "CLARIFIER_2_SLR",
   "CLARIFIER_2_SOR",
   "NAB2_CPASS_TOTAL_COD",
@@ -301,7 +320,8 @@ colnames(control_eps) <- c("timestamp", "control_total_cod_mgcod_per_gvss",
 
 #get NAB2 factors
 others <- NAB2 %>% select(timestamp,
-"log_control_NAB2",
+"log_control_ecoli",
+"log_control_reduction",
 "Clarifier 9 SLR (ppd/sf)"                                  
 ,"Clarifier 9 SOR (gpd/sf)" 
 ,"AB9A DO (mg/L)"      
@@ -338,6 +358,7 @@ others <- NAB2 %>% select(timestamp,
 colnames(others) <- new_names_vector <- c(
   "timestamp",
   "log_ecoli",
+  "log_reduction",
   "CLARIFIER_9_SLR",
   "CLARIFIER_9_SOR",
   "AB9A_DO",
@@ -357,7 +378,6 @@ colnames(others) <- new_names_vector <- c(
   "NNE_TKNH",
   "NNE_TSS",
   "NNE_VSS",
-  
   "NAB4_and_9_CPASS_TOTAL_COD",
   "NAB4_and_9_CPASS_VSS",
   "NAB4_and_9_CPASS_TKNH",
@@ -377,6 +397,7 @@ others <- others %>%
   select(
     timestamp,
     log_ecoli,
+    log_reduction,
     CLARIFIER_9_SLR,
     CLARIFIER_9_SOR,
     NAB4_and_9_CPASS_TOTAL_COD,
@@ -426,8 +447,6 @@ control_eps <- left_join(control_eps, others, by = "timestamp")
 control_eps <- left_join(control_eps, ASRT_main[,-2], by = "timestamp")
 control_eps <- left_join(control_eps, ASRT_other_control, by = "timestamp")
 
-view(control_eps$AB4_and_9_INF_FLOW)
-
 
 ```
 
@@ -453,6 +472,7 @@ new_column_names <- c(
 ,"tb_carbs_mgcarb_per_gvss"         
 ,"tb_pn_to_ps"      
 ,"log_ecoli"
+,"log_reduction"
 ,"CLARIFIER_X_SLR"                        
 ,"CLARIFIER_X_SOR"                       
 ,"NABX_CPASS_TOTAL_COD"                   
@@ -515,8 +535,8 @@ all_casdas$'ABX_MLR_FLOW'[all_casdas$'ABX_MLR_FLOW' == 0] <- NA
 Make Distributions
 ```{r}
 
-# Get the variable names from columns 2-49
-variable_names <- names(all_casdas)[2:49]
+# Get the variable names from columns 2-50
+variable_names <- names(all_casdas)[2:50]
 
 # Perform comparison for each variable
 for (variable in variable_names) {
@@ -534,7 +554,27 @@ for (variable in variable_names) {
   print(plot)
 }
 
+
 ```
+
+Make seperate plot for ecoli
+```{r}
+
+# Convert 'system' to a factor variable
+all_casdas$system <- factor(all_casdas$system, levels = c(2, 9), labels = c("Pilot", "Control"))
+
+# Create a boxplot using ggplot2 with updated labels and colors
+ggplot(all_casdas, aes(x = system, y = log_ecoli, fill = system)) +
+  geom_boxplot() +
+  labs(x = "System", y = "Log Transformed E. coli Concentration (EC/100mL)",
+       title = "Effluent E. coli Concentration by System") +
+  scale_fill_manual(values = c("Pilot" = "#2596be", "Control" = "#eeb26f"))
+
+
+```
+
+
+
 
 
 Make t-tests in table
@@ -548,7 +588,7 @@ t_tests <- data.frame(
 )
 
 # Get the variable names from columns 2-49
-variable_names <- names(all_casdas)[2:49]
+variable_names <- names(all_casdas)[2:50]
 
 # Perform comparison for each variable
 for (variable in variable_names) {
@@ -595,8 +635,8 @@ confidence_intervals <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Get the variable names from columns 2-49
-variable_names <- names(all_casdas)[2:49]
+# Get the variable names from columns 2-50
+variable_names <- names(all_casdas)[2:50]
 
 # Perform calculation for each variable
 for (variable in variable_names) {
